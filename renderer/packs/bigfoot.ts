@@ -2,7 +2,7 @@
 // bandana in its own color (that's also its progress-bar color), and very big feet.
 // Napping Bigfoots hide behind a pine tree, as Bigfoots do.
 (function () {
-  const { toolSVG } = window.packTools;
+  const { toolSVG, toolAngleFor } = window.packTools;
   const INK = '#24180f';
 
   const CHARACTERS = [
@@ -23,6 +23,7 @@
     { name: 'Stomper', role: 'the Digger', hat: '#c9a227', tool: 'shovel', extra: 'twig',
       fur: { main: '#8a5838', dark: '#664027', face: '#d4a985' } },
   ];
+  type Char = (typeof CHARACTERS)[number];
 
   // Bigfoot-only animation: napping means hiding behind a pine tree, peeking out.
   const css = document.createElement('style');
@@ -34,7 +35,7 @@
   `;
   document.head.appendChild(css);
 
-  function extraSVG(extra, c, f) {
+  function extraSVG(extra: string, c: Char, f: Char['fur']): string {
     switch (extra) {
       case 'beanie':
         return `<path d="M15.6 20.4 Q15.8 11.4 24 11.2 Q32.2 11.4 32.4 20.4 Z" fill="${c.hat}"/>
@@ -83,9 +84,9 @@
     }
   }
 
-  function draw(c, size) {
+  function draw(c: Char, size: number): string {
     const f = c.fur;
-    const toolAngle = { can: 0, lantern: 0, magnifier: 10 }[c.tool] ?? 18;
+    const toolAngle = toolAngleFor(c.tool);
     const sole = f.face;
     return `
 <svg class="gnome-svg pack-bigfoot tool-${c.tool}" viewBox="0 0 48 56" width="${size}" height="${(size * 56) / 48}" aria-hidden="true">

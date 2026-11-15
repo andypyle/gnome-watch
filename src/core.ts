@@ -1,30 +1,88 @@
 // Agent state + hook-event handling. No Electron imports, so it can be tested with plain Node.
 
-const path = require('path');
+import * as fs from 'fs';
+import * as path from 'path';
+import type { ServerResponse } from 'http';
+
+// Claude Code hook payload. Only the fields we read; tool inputs vary per tool.
+export type ToolInput = Record<string, any>;
+export interface HookEvent {
+  hook_event_name?: string;
+  session_id?: string;
+  cwd?: string;
+  tool_name?: string;
+  tool_input?: ToolInput;
+  agent_id?: string;
+  agent_type?: string;
+  model?: string | { id?: string };
+  to_model?: string;
+  from_model?: string;
+  prompt?: string;
+  transcript_path?: string;
+  notification_type?: string;
+  message?: string;
+  task_id?: string | number;
+  task_subject?: string;
+  _claude_pid?: number | null; // added by hook/gnome-hook.ts; null when it couldn't tell
+}
+
+export type Status = 'idle' | 'working' | 'waiting' | 'done' | 'ended';
+export type PromptKind = 'question' | 'permission';
+interface Task { subject: string; done: boolean }
+interface Helper { id: string; type: string; status: 'working' | 'done'; activity: string; startedAt: number; lastEvent: number }
+interface Agent {
+  id: string;
+  slot: number;
+  baseName: string;
+  name: string;
+  cwd: string;
+  status: Status;
+  activity: string;
+  model: string | null;
+  modelCheckedAt: number;
+  tasks: Map<string, Task>;
+  subagents: Map<string, Helper>;
+  startedAt: number;
+  lastEvent: number;
+  endedAt: number | null;
+  pid?: number;
+}
+interface Pending {
+  id: string;
+  sessionId: string;
+  kind: PromptKind;
+  toolName?: string;
+  toolInput: ToolInput;
+  createdAt: number;
+  res: ServerResponse | null;
+  timer: NodeJS.Timeout;
+}
+export type SavedAgent = Omit<Agent, 'tasks' | 'subagents' | 'modelCheckedAt'> & { tasks: [string, Task][] };
+export type AgentView = ReturnType<ReturnType<typeof createCore>['snapshot']>['agents'][number];
 
 const RELEASE_BEFORE_MS = 570 * 1000; // hand back to VS Code before Claude Code's 600s hook timeout
 const REMOVE_ENDED_AFTER_MS = 4000;
 const CHARACTER_COUNT = 8;
 
 // Stable pick for a project folder: the same folder always maps to the same character.
-function projectSlot(key) {
+export function projectSlot(key: string): number {
   let h = 2166136261;
   for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
   return (h >>> 0) % CHARACTER_COUNT;
 }
-const HELPER_LINGER_MS = 4000;
-const STALE_WORKING_MS = 15 * 60 * 1000; // "working" with no news for this long -> idle (e.g. you interrupted it) // a finished helper shows ✓ this long
+const HELPER_LINGER_MS = 4000; // a finished helper shows ✓ this long
+const STALE_WORKING_MS = 15 * 60 * 1000; // "working" with no news for this long -> idle (e.g. you interrupted it)
 const HELPER_STALE_MS = 15 * 60 * 1000; // hide helpers we haven't heard from in this long
 
 // "design-agent" -> "Design agent", "general-purpose" -> "General purpose", "Explore" -> "Explore"
-function helperLabel(type) {
+export function helperLabel(type?: string): string {
   const t = String(type || 'helper').replace(/^.*:/, '').replace(/[-_]+/g, ' ').trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-function describeTool(name, input = {}) {
-  const short = (s, n = 60) => {
-    s = String(s || '').replace(/\s+/g, ' ').trim();
+export function describeTool(name?: string, input: ToolInput = {}): string {
+  const short = (v: unknown, n = 60) => {
+    const s = String(v || '').replace(/\s+/g, ' ').trim();
     return s.length > n ? s.slice(0, n - 1) + '…' : s;
   };
   const file = input.file_path || input.path || input.notebook_path;
@@ -64,7 +122,7 @@ function describeTool(name, input = {}) {
 }
 
 // "claude-opus-5-5" -> "Opus 5.5", "claude-sonnet-4-5-20250929" -> "Sonnet 4.5"
-function prettyModel(id) {
+export function prettyModel(id: string | null | undefined): string | null {
   if (!id) return null;
   const raw = String(id).replace(/\[.*?\]/g, '');
   const m = /(opus|sonnet|haiku|fable|mythos)[-_ ]?(\d+)(?:[-.](\d{1,2})(?!\d))?/i.exec(raw);
@@ -74,10 +132,9 @@ function prettyModel(id) {
 }
 
 // Backup: read the newest model name from the end of the session's transcript file.
-function modelFromTranscript(file) {
+function modelFromTranscript(file?: string): string | null {
   if (!file) return null;
   try {
-    const fs = require('fs');
     const size = fs.statSync(file).size;
     const len = Math.min(size, 256 * 1024);
     const buf = Buffer.alloc(len);
@@ -86,18 +143,24 @@ function modelFromTranscript(file) {
     fs.closeSync(fd);
     const matches = buf.toString('utf8').match(/"model"\s*:\s*"(claude-[^"]+|[a-z]+-[^"]*(?:opus|sonnet|haiku|fable|mythos)[^"]*)"/g);
     if (!matches) return null;
-    return /"([^"]+)"$/.exec(matches[matches.length - 1])[1];
+    return /"([^"]+)"$/.exec(matches[matches.length - 1])![1];
   } catch {
     return null;
   }
 }
 
-function createCore({ onChange = () => {}, shouldHold = () => true, now = () => Date.now() } = {}) {
-  const agents = new Map(); // session_id -> agent
-  const pending = new Map(); // id -> { id, sessionId, kind, toolName, toolInput, message, res, createdAt, timer }
+interface CoreOptions {
+  onChange?: () => void;
+  shouldHold?: (a: Agent) => boolean;
+  now?: () => number;
+}
+
+export function createCore({ onChange = () => {}, shouldHold = () => true, now = () => Date.now() }: CoreOptions = {}) {
+  const agents = new Map<string, Agent>(); // session_id -> agent
+  const pending = new Map<string, Pending>(); // prompt id -> held prompt
   let seq = 0;
 
-  function agentFor(ev) {
+  function agentFor(ev: HookEvent): Agent {
     const sid = ev.session_id || 'unknown';
     let a = agents.get(sid);
     if (!a) {
@@ -132,22 +195,22 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     return a;
   }
 
-  function updateModel(a, ev) {
+  function updateModel(a: Agent, ev: HookEvent) {
     if (ev.to_model) a.model = ev.to_model; // PostModelSwitch / PreModelSwitch
     else if (ev.model && !ev.agent_id) a.model = typeof ev.model === 'string' ? ev.model : ev.model.id || a.model;
     // Fall back to the transcript, but don't read it more than every 15s.
     const checkpoints = ['SessionStart', 'UserPromptSubmit', 'Stop', 'PostToolUse'];
-    if (checkpoints.includes(ev.hook_event_name) && ev.transcript_path && now() - a.modelCheckedAt > 15000) {
+    if (checkpoints.includes(ev.hook_event_name || '') && ev.transcript_path && now() - a.modelCheckedAt > 15000) {
       a.modelCheckedAt = now();
       const found = modelFromTranscript(ev.transcript_path);
       if (found && !(ev.hook_event_name === 'SessionStart' && a.model)) a.model = found;
     }
   }
 
-  function helperFor(a, ev) {
+  function helperFor(a: Agent, ev: HookEvent & { agent_id: string }): Helper {
     let h = a.subagents.get(ev.agent_id);
     if (!h) {
-      h = { id: ev.agent_id, type: ev.agent_type || 'helper', status: 'working', activity: 'Working', startedAt: now() };
+      h = { id: ev.agent_id, type: ev.agent_type || 'helper', status: 'working', activity: 'Working', startedAt: now(), lastEvent: now() };
       a.subagents.set(ev.agent_id, h);
     }
     if (ev.agent_type && (!h.type || h.type === 'helper')) h.type = ev.agent_type;
@@ -155,31 +218,30 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     return h;
   }
 
-  function hasPending(sessionId) {
+  function hasPending(sessionId: string): boolean {
     for (const p of pending.values()) if (p.sessionId === sessionId) return true;
     return false;
   }
 
-  function setWorking(a, activity) {
+  function setWorking(a: Agent, activity?: string) {
     if (!hasPending(a.id)) a.status = 'working';
     if (activity) a.activity = activity;
   }
 
   // Returns the response body string for the hook, or null if the request is being held.
-  function handleEvent(ev, res) {
+  function handleEvent(ev: HookEvent, res: ServerResponse | null): string | null {
     const name = ev.hook_event_name;
     const a = agentFor(ev);
     updateModel(a, ev);
     if (ev._claude_pid) a.pid = ev._claude_pid;
     // Events from inside a helper (subagent) update that helper, not the main agent's line.
-    const sub = ev.agent_id && name !== 'SubagentStop' ? helperFor(a, ev) : null;
-    let reply = '';
+    const sub = ev.agent_id && name !== 'SubagentStop' ? helperFor(a, { ...ev, agent_id: ev.agent_id }) : null;
     if (sub && (name === 'PreToolUse' || name === 'PostToolUse') && ev.tool_name !== 'AskUserQuestion') {
       if (name === 'PreToolUse') sub.activity = describeTool(ev.tool_name, ev.tool_input);
       else trackTasksFromTool(a, ev);
       // A helper working in the background doesn't mean the main agent is: leave its status alone.
       onChange();
-      return reply;
+      return '';
     }
 
     switch (name) {
@@ -226,7 +288,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
             a.status = 'done';
             a.activity = 'Waiting for your next message';
           }
-        } else if (['permission_prompt', 'agent_needs_input', 'elicitation_dialog', 'elicitation_url_dialog'].includes(t)) {
+        } else if (['permission_prompt', 'agent_needs_input', 'elicitation_dialog', 'elicitation_url_dialog'].includes(t || '')) {
           if (!hasPending(a.id)) {
             a.status = 'waiting';
             a.activity = ev.message || 'Needs you in VS Code';
@@ -245,21 +307,21 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
         break;
 
       case 'SubagentStart': {
-        const h = helperFor(a, ev);
+        const h = helperFor(a, { ...ev, agent_id: ev.agent_id || 'unknown' });
         h.activity = 'Getting started';
         setWorking(a, `Sent ${helperLabel(h.type)} off to work`);
         break;
       }
 
       case 'SubagentStop': {
-        const h = a.subagents.get(ev.agent_id);
+        const h = ev.agent_id ? a.subagents.get(ev.agent_id) : undefined;
         if (h) {
           h.status = 'done';
           h.activity = 'Done';
           // Let it show a ✓ for a moment, then leave.
           setTimeout(() => {
-            if (a.subagents.get(ev.agent_id) === h) {
-              a.subagents.delete(ev.agent_id);
+            if (a.subagents.get(h.id) === h) {
+              a.subagents.delete(h.id);
               onChange();
             }
           }, HELPER_LINGER_MS);
@@ -274,7 +336,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
 
       case 'TaskCompleted':
         if (ev.task_id) {
-          const t = a.tasks.get(String(ev.task_id)) || { subject: ev.task_subject || 'Task' };
+          const t = a.tasks.get(String(ev.task_id)) || { subject: ev.task_subject || 'Task', done: true };
           t.done = true;
           a.tasks.set(String(ev.task_id), t);
         }
@@ -296,28 +358,28 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     }
 
     onChange();
-    return reply;
+    return '';
   }
 
   // Backup task tracking from the tools themselves, for setups where the
   // TaskCreated/TaskCompleted events don't fire (e.g. older Claude Code using TodoWrite).
-  function trackTasksFromTool(a, ev) {
+  function trackTasksFromTool(a: Agent, ev: HookEvent) {
     const input = ev.tool_input || {};
     if (ev.tool_name === 'TodoWrite' && Array.isArray(input.todos)) {
       a.tasks.clear();
-      input.todos.forEach((t, i) =>
+      input.todos.forEach((t: { content?: string; subject?: string; status?: string }, i: number) =>
         a.tasks.set(`todo-${i}`, { subject: t.content || t.subject || 'Task', done: t.status === 'completed' })
       );
     } else if (ev.tool_name === 'TaskUpdate' && input.taskId != null) {
       const id = String(input.taskId);
       if (input.status === 'deleted') a.tasks.delete(id);
-      else if (input.status === 'completed' && a.tasks.has(id)) a.tasks.get(id).done = true;
+      else if (input.status === 'completed' && a.tasks.has(id)) a.tasks.get(id)!.done = true;
     }
   }
 
-  function hold(a, kind, ev, res) {
+  function hold(a: Agent, kind: PromptKind, ev: HookEvent, res: ServerResponse | null): null {
     const id = `p${++seq}`;
-    const p = {
+    const p: Pending = {
       id,
       sessionId: a.id,
       kind,
@@ -330,7 +392,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     pending.set(id, p);
     a.status = 'waiting';
     a.activity = kind === 'question' ? 'Has a question for you' : `Wants to use ${ev.tool_name}`;
-    if (res && res.on) {
+    if (res) {
       // Claude Code gave up on the hook (interrupt, timeout): forget the prompt.
       res.on('close', () => {
         if (pending.has(id) && !res.writableEnded) drop(id, 'Prompt cancelled');
@@ -340,7 +402,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     return null;
   }
 
-  function finish(id, body) {
+  function finish(id: string, body: string): Pending | false {
     const p = pending.get(id);
     if (!p) return false;
     clearTimeout(p.timer);
@@ -356,7 +418,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     return p;
   }
 
-  function drop(id, activity) {
+  function drop(id: string, activity: string) {
     const p = pending.get(id);
     if (!p) return;
     clearTimeout(p.timer);
@@ -370,7 +432,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
   }
 
   // Hand the prompt back to Claude Code's own dialog in VS Code.
-  function release(id) {
+  function release(id: string) {
     const p = finish(id, '');
     if (!p) return;
     const a = agents.get(p.sessionId);
@@ -381,7 +443,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     onChange();
   }
 
-  function releaseSession(sessionId) {
+  function releaseSession(sessionId: string) {
     for (const p of [...pending.values()]) if (p.sessionId === sessionId) release(p.id);
   }
 
@@ -389,7 +451,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     for (const id of [...pending.keys()]) release(id);
   }
 
-  function resolve(id, action, answers) {
+  function resolve(id: string, action: 'allow' | 'deny' | 'answer' | 'vscode', answers?: Record<string, string>): boolean {
     const p = pending.get(id);
     if (!p) return false;
     const a = agents.get(p.sessionId);
@@ -456,7 +518,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
 
   // Called every so often by the app. Removes agents whose Claude Code process has exited
   // (closed window, killed terminal) and settles agents that went quiet mid-task (e.g. interrupted).
-  function sweep(isAlive) {
+  function sweep(isAlive: (pid: number) => boolean) {
     let changed = false;
     for (const a of [...agents.values()]) {
       if (a.pid && !isAlive(a.pid)) {
@@ -481,16 +543,16 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
   }
 
   // Save/restore agents so restarting the widget doesn't lose sessions that are still open.
-  function serialize() {
+  function serialize(): SavedAgent[] {
     return [...agents.values()]
       .filter((a) => a.status !== 'ended')
       .map(({ tasks, subagents, modelCheckedAt, ...rest }) => ({ ...rest, tasks: [...tasks.entries()] }));
   }
 
-  function restore(list, maxAgeMs = 3 * 60 * 60 * 1000) {
+  function restore(list: SavedAgent[] | null | undefined, maxAgeMs = 3 * 60 * 60 * 1000) {
     for (const s of list || []) {
       if (!s || !s.id || agents.has(s.id) || now() - (s.lastEvent || 0) > maxAgeMs) continue;
-      const a = { ...s, tasks: new Map(s.tasks || []), subagents: new Map(), modelCheckedAt: 0 };
+      const a: Agent = { ...s, tasks: new Map(s.tasks || []), subagents: new Map(), modelCheckedAt: 0 };
       // Anything mid-flight when we stopped is stale; the next hook event will correct it.
       if (a.status === 'working' || a.status === 'waiting') {
         a.activity = a.status === 'waiting' ? 'May be waiting for you in VS Code' : 'Checking in…';
@@ -501,7 +563,5 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     onChange();
   }
 
-  return { handleEvent, resolve, release, releaseAll, snapshot, serialize, restore, sweep, agents, pending };
+  return { handleEvent, resolve, release, releaseSession, releaseAll, snapshot, serialize, restore, sweep, agents, pending };
 }
-
-module.exports = { createCore, describeTool, prettyModel, helperLabel, projectSlot };

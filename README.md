@@ -43,7 +43,7 @@ npm start
 
 `npm run install-hooks` adds Gnome Watch's hooks to your user-level Claude Code settings (`~/.claude/settings.json`). It saves a backup first, keeps your other settings and hooks, and is safe to run again. **Restart any Claude Code sessions that were already open** so they pick up the hooks.
 
-Keep the `gnome-watch` folder where it is after installing, because the hooks run a script inside it. If you switch Node versions (nvm, a Homebrew upgrade), run `npm run install-hooks` again.
+Keep the `gnome-watch` folder where it is after installing, because the hooks run a script inside it (`out/hook/gnome-hook.js`). If you installed the hooks before the TypeScript move, run `npm run install-hooks` again. If you switch Node versions (nvm, a Homebrew upgrade), run `npm run install-hooks` again.
 
 ### Build the app and start it at login (macOS)
 
@@ -80,7 +80,7 @@ After changing the code, run `npm run install:mac` again. It quits the running a
 ## How it works
 
 ```
-Claude Code ──hook──▶ hook/gnome-hook.js ──HTTP on localhost, with a token──▶ Gnome Watch app
+Claude Code ──hook──▶ out/hook/gnome-hook.js ──HTTP on localhost, with a token──▶ Gnome Watch app
                                 ◀── decision JSON (permissions and questions only) ──┘
 ```
 
@@ -93,13 +93,13 @@ If the app isn't running, the hooks exit right away, as if they weren't installe
 
 | Path | What it does |
 |---|---|
-| `src/core.js` | Agent state, tasks, helpers, models, and holding and answering prompts |
-| `src/server.js` | Local server. It writes its port and a random token to `~/.gnome-watch/server.json`. |
-| `src/focus.js` | Detects when VS Code (or Cursor or Windsurf) is in front |
-| `src/main.js` | Window, drawer behavior, menu-bar menu |
-| `renderer/` | The UI (plain HTML/CSS/JS) |
+| `src/core.ts` | Agent state, tasks, helpers, models, and holding and answering prompts |
+| `src/server.ts` | Local server. It writes its port and a random token to `~/.gnome-watch/server.json`. |
+| `src/focus.ts` | Detects when VS Code (or Cursor or Windsurf) is in front |
+| `src/main.ts` | Window, drawer behavior, menu-bar menu |
+| `renderer/` | The UI (plain HTML/CSS and TypeScript, no framework) |
 | `renderer/packs/` | Character packs |
-| `hook/gnome-hook.js` | The hook script Claude Code runs |
+| `hook/gnome-hook.ts` | The hook script Claude Code runs (compiled to `out/hook/gnome-hook.js`) |
 | `scripts/` | Install and uninstall the hooks |
 
 ### Privacy
@@ -110,7 +110,7 @@ For troubleshooting, the app keeps a log of raw hook events in `~/.gnome-watch/e
 
 ## Adding a character pack
 
-A pack is one file in `renderer/packs/`. It defines 8 characters and a `draw(character, size)` function that returns an SVG. Copy `renderer/packs/cats.js` or `renderer/packs/bigfoot.js` as a starting point. To get the shared animations for free, the SVG needs to use the same part classes:
+A pack is one file in `renderer/packs/`. It defines 8 characters and a `draw(character, size)` function that returns an SVG. Copy `renderer/packs/cats.ts` or `renderer/packs/bigfoot.ts` as a starting point. To get the shared animations for free, the SVG needs to use the same part classes:
 
 - `g-body`, `g-head`, `g-eye`
 - `g-eyes-open` / `g-eyes-closed`
@@ -119,7 +119,7 @@ A pack is one file in `renderer/packs/`. It defines 8 characters and a `draw(cha
 
 Each character's `hat` color is used for its progress bar and accents.
 
-Then add a `<script>` tag for it in `renderer/index.html` and an entry in the `PACKS` list in `src/main.js`.
+Then add a `<script src="../out/renderer/packs/<name>.js">` tag for it in `renderer/index.html` and an entry in the `PACKS` list in `src/main.ts`.
 
 ## Uninstall
 
@@ -144,6 +144,7 @@ This removes only Gnome Watch's hooks from `~/.claude/settings.json`. Then delet
 ## Development
 
 ```bash
+npm run build  # compile TypeScript to out/ (start, test and install-hooks do this for you)
 npm start      # run from source
 npm test       # end-to-end test: hook script → server → decisions
 ```

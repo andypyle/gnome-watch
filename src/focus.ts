@@ -2,17 +2,21 @@
 // Calls onChange(state) where state is 'editor' (VS Code or a fork is in front),
 // 'other', or 'unknown' (we couldn't tell on this system).
 
-const { execFile, spawn } = require('child_process');
-const fs = require('fs');
+import { execFile, spawn } from 'child_process';
+import * as fs from 'fs';
+
+export type Focus = 'editor' | 'other' | 'unknown';
+interface FrontApp { bundle?: string; name?: string; method: string }
+type Done = (app: FrontApp | null, err?: string) => void;
 
 const MAC_EDITOR_BUNDLES = /^(com\.microsoft\.VSCode(Insiders)?|com\.todesktop\..+|com\.exafunction\.windsurf|com\.vscodium.*)$/i;
 const MAC_EDITOR_NAMES = /^(Code|Visual Studio Code|Code - Insiders|Cursor|Windsurf|VSCodium)$/i;
 const WIN_EDITOR_RE = /^(Code|Code - Insiders|Cursor|Windsurf|VSCodium)$/i;
 const LINUX_EDITOR_RE = /^(code|code-insiders|cursor|windsurf|codium)$/i;
 
-function watchFocus(onChange, onDetail = () => {}, intervalMs = 1000) {
-  let last = null;
-  const emit = (s) => {
+export function watchFocus(onChange: (s: Focus) => void, onDetail: (d: object) => void = () => {}, intervalMs = 1000): () => void {
+  let last: Focus | null = null;
+  const emit = (s: Focus) => {
     if (s !== last) {
       last = s;
       onChange(s);
@@ -25,13 +29,13 @@ function watchFocus(onChange, onDetail = () => {}, intervalMs = 1000) {
     const JXA =
       'ObjC.import("AppKit"); var a = $.NSWorkspace.sharedWorkspace.frontmostApplication; ' +
       '(a.bundleIdentifier.js || "") + "|" + (a.localizedName.js || "")';
-    const viaJxa = (done) =>
+    const viaJxa = (done: Done) =>
       execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', JXA], { timeout: 3000 }, (e, out) => {
         if (e) return done(null, `jxa error: ${e.message}`);
         const [bundle, name] = out.trim().split('|');
         done({ bundle, name, method: 'jxa' });
       });
-    const viaLsappinfo = (done) =>
+    const viaLsappinfo = (done: Done) =>
       execFile('/usr/bin/lsappinfo', ['front'], { timeout: 2000 }, (e, asn) => {
         asn = (asn || '').trim();
         if (e || !/^ASN:/.test(asn)) return done(null, `lsappinfo front gave: ${e ? e.message : JSON.stringify(asn)}`);
@@ -45,7 +49,7 @@ function watchFocus(onChange, onDetail = () => {}, intervalMs = 1000) {
       });
     let useJxa = false;
     const tick = () => {
-      const handle = (app, err) => {
+      const handle: Done = (app, err) => {
         if (!app) {
           onDetail({ error: err });
           if (!useJxa) {
@@ -86,10 +90,10 @@ while ($true) {
       windowsHide: true,
     });
     let buf = '';
-    ps.stdout.on('data', (d) => {
+    ps.stdout.on('data', (d: Buffer) => {
       buf += d.toString();
       const lines = buf.split(/\r?\n/);
-      buf = lines.pop();
+      buf = lines.pop() ?? "";
       const name = lines.filter(Boolean).pop();
       if (name !== undefined) emit(WIN_EDITOR_RE.test(name.trim()) ? 'editor' : 'other');
     });
@@ -113,4 +117,3 @@ while ($true) {
   return () => clearInterval(t);
 }
 
-module.exports = { watchFocus };

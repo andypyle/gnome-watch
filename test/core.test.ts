@@ -1,38 +1,43 @@
 // End-to-end test: starts the real server, pipes fake Claude Code events through the
 // real hook script, and checks the state and the decisions printed back.
 // Uses a temporary HOME so it never touches your real settings.
-const assert = require('assert');
-const os = require('os');
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+import assert from 'assert';
+import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
+import { spawn } from 'child_process';
 
 const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'gw-'));
 process.env.HOME = tmpHome;
 process.env.USERPROFILE = tmpHome;
-os.homedir = () => tmpHome;
+assert.equal(os.homedir(), tmpHome); // os.homedir() follows HOME, so nothing below touches your real files
 
-const { createCore } = require('../src/core');
-const { startServer } = require('../src/server');
+// require (not import) so these load after the HOME override above; imports would be hoisted
+// and the server would read your real ~/.gnome-watch.
+const { createCore, prettyModel, projectSlot } = require('../src/core') as typeof import('../src/core');
+const { startServer } = require('../src/server') as typeof import('../src/server');
+type Core = ReturnType<typeof createCore>;
+type Ev = import('../src/core').HookEvent;
 const HOOK = path.join(__dirname, '..', 'hook', 'gnome-hook.js');
 
-function runHook(ev) {
+function run(script: string, args: string[] = [], stdin = ''): Promise<{ code: number | null; out: string }> {
   return new Promise((resolve) => {
-    const p = spawn(process.execPath, [HOOK], { env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome } });
+    const p = spawn(process.execPath, [script, ...args], { env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome } });
     let out = '';
-    p.stdout.on('data', (d) => (out += d));
+    p.stdout.on('data', (d: Buffer) => (out += d));
     p.on('exit', (code) => resolve({ code, out }));
-    p.stdin.end(JSON.stringify(ev));
+    p.stdin.end(stdin);
   });
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const runHook = (ev: Ev) => run(HOOK, [], JSON.stringify(ev));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
   let hold = true;
   const core = createCore({ shouldHold: () => hold });
   const { server } = await startServer(core);
   const S = { session_id: 's1', cwd: '/Users/andy/projects/website' };
-  const agent = () => core.snapshot().agents.find((a) => a.id === 's1');
+  const agent = () => core.snapshot().agents.find((a) => a.id === 's1')!;
 
   await runHook({ ...S, hook_event_name: 'SessionStart' });
   assert.equal(agent().name, 'website');
@@ -107,7 +112,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.equal(core.snapshot().agents[1].name, 'website #2');
 
   // Wrong token is rejected
-  const bad = await fetch(`http://127.0.0.1:${JSON.parse(fs.readFileSync(path.join(tmpHome, '.gnome-watch', 'server.json'))).port}/event`, {
+  const bad = await fetch(`http://127.0.0.1:${JSON.parse(fs.readFileSync(path.join(tmpHome, '.gnome-watch', 'server.json'), 'utf8')).port}/event`, {
     method: 'POST',
     headers: { 'x-gnome-token': 'nope' },
     body: '{}',
@@ -122,7 +127,6 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.equal(off.out, '');
 
   // Model: pretty names
-  const { prettyModel } = require('../src/core');
   assert.equal(prettyModel('claude-opus-5-5'), 'Opus 5.5');
   assert.equal(prettyModel('claude-sonnet-4-5-20250929'), 'Sonnet 4.5');
   assert.equal(prettyModel('claude-haiku-5-5[1m]'), 'Haiku 5.5');
@@ -131,7 +135,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Model: from SessionStart, then PostModelSwitch, then the transcript fallback
   const core2 = createCore();
-  const ev = (o) => core2.handleEvent({ session_id: 'm1', cwd: '/x/proj', ...o }, null);
+  const ev = (o: Ev) => core2.handleEvent({ session_id: 'm1', cwd: '/x/proj', ...o }, null);
   const m = () => core2.snapshot().agents[0];
   ev({ hook_event_name: 'SessionStart', model: 'claude-opus-5-5' });
   assert.equal(m().model, 'Opus 5.5');
@@ -154,14 +158,13 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.equal(r1.length, 2);
   assert.equal(r1[0].model, 'Sonnet 5.5');
   assert.equal(r1[0].slot, saved[0].slot); // keeps its gnome across restarts
-  core3.restore([{ id: 'old', slot: 5, name: 'old', status: 'idle', lastEvent: Date.now() - 5 * 3600e3, tasks: [] }]);
+  core3.restore([{ id: 'old', slot: 5, name: 'old', status: 'idle', lastEvent: Date.now() - 5 * 3600e3, tasks: [] }] as unknown as import('../src/core').SavedAgent[]);
   assert.equal(core3.snapshot().agents.length, 2); // too old, skipped
   core3.handleEvent({ session_id: 'm3', cwd: '/y/new', hook_event_name: 'SessionStart' }, null);
   const slots3 = core3.snapshot().agents.map((x) => x.slot);
   assert.equal(new Set(slots3).size, 3); // never two of the same gnome on screen
 
   // Same project -> same gnome, every time
-  const { projectSlot } = require('../src/core');
   const c4 = createCore();
   c4.handleEvent({ session_id: 'p1', cwd: '/Users/andy/code/apps/eventory', hook_event_name: 'SessionStart' }, null);
   assert.equal(c4.snapshot().agents[0].slot, projectSlot('/Users/andy/code/apps/eventory'));
@@ -177,7 +180,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Background helper working after the main agent finished: main stays "done"
   const c5 = createCore();
-  const e5 = (o) => c5.handleEvent({ session_id: 'bg', cwd: '/z/eventory', ...o }, null);
+  const e5 = (o: Ev) => c5.handleEvent({ session_id: 'bg', cwd: '/z/eventory', ...o }, null);
   e5({ hook_event_name: 'UserPromptSubmit' });
   e5({ hook_event_name: 'SubagentStart', agent_id: 'd1', agent_type: 'design-agent' });
   e5({ hook_event_name: 'Stop' });
@@ -198,17 +201,39 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const tmpH = fs.mkdtempSync(path.join(os.tmpdir(), 'gw2-'));
     const core6 = createCore();
     process.env.HOME = tmpH;
-    os.homedir = () => tmpH;
     delete require.cache[require.resolve('../src/server')];
-    const { startServer: start2 } = require('../src/server');
+    const { startServer: start2 } = require('../src/server') as typeof import('../src/server');
     const { server: s6 } = await start2(core6);
     await new Promise((r) => {
       const p = spawn(process.execPath, [HOOK], { env: { ...process.env, HOME: tmpH } });
       p.on('exit', r);
       p.stdin.end(JSON.stringify({ session_id: 'pp', cwd: '/q', hook_event_name: 'SessionStart' }));
     });
-    assert.ok(core6.agents.get('pp').pid > 0);
+    assert.ok(core6.agents.get('pp')!.pid! > 0);
     s6.close();
+  }
+
+  // install-hooks keeps your own hooks, replaces old Gnome Watch entries; uninstall removes only ours
+  {
+    process.env.HOME = tmpHome;
+    const file = path.join(tmpHome, '.claude', 'settings.json');
+    const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'my-linter' }] };
+    const oldOurs = { matcher: '*', hooks: [{ type: 'command', command: 'node /old/place/hook/gnome-hook.js' }] };
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ model: 'opus', hooks: { PreToolUse: [mine, oldOurs] } }));
+    const scripts = path.join(__dirname, '..', 'scripts');
+    assert.equal((await run(path.join(scripts, 'install-hooks.js'))).code, 0);
+    const installed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(installed.model, 'opus');
+    assert.deepEqual(installed.hooks.PreToolUse[0], mine);
+    for (const entries of Object.values(installed.hooks) as { hooks: { command: string }[] }[][]) {
+      const ours = entries.flatMap((e) => e.hooks).filter((h) => h.command.includes('gnome-hook.js'));
+      assert.equal(ours.length, 1);
+      assert.ok(!ours[0].command.includes('/old/place/'));
+    }
+    assert.equal((await run(path.join(scripts, 'uninstall-hooks.js'))).code, 0);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { model: 'opus', hooks: { PreToolUse: [mine] } });
+    assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((f) => f.includes('backup')), ['settings.json.gnome-watch-backup']); // no pile-up
   }
 
   console.log('All tests passed');

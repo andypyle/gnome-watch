@@ -1,23 +1,24 @@
-// Localhost HTTP server that receives events from hook/gnome-hook.js.
-const http = require('http');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const crypto = require('crypto');
+// Localhost HTTP server that receives events from hook/gnome-hook.ts.
+import * as http from 'http';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import type { createCore, HookEvent } from './core';
 
-const DIR = path.join(os.homedir(), '.gnome-watch');
+export const DIR = path.join(os.homedir(), '.gnome-watch');
 const CONFIG = path.join(DIR, 'server.json');
 const LOG = path.join(DIR, 'events.log');
 const DEFAULT_PORT = 47823;
 
-function logEvent(raw) {
+function logEvent(raw: string) {
   try {
     if (fs.existsSync(LOG) && fs.statSync(LOG).size > 2 * 1024 * 1024) fs.renameSync(LOG, LOG + '.old');
     fs.appendFileSync(LOG, `${new Date().toISOString()} ${raw.replace(/\n/g, ' ')}\n`);
   } catch {}
 }
 
-function startServer(core) {
+export function startServer(core: ReturnType<typeof createCore>): Promise<{ server: http.Server; port: number }> {
   fs.mkdirSync(DIR, { recursive: true });
   const token = crypto.randomBytes(24).toString('hex');
 
@@ -34,14 +35,14 @@ function startServer(core) {
     });
     req.on('end', () => {
       logEvent(raw);
-      let ev;
+      let ev: HookEvent;
       try {
         ev = JSON.parse(raw);
       } catch {
         res.writeHead(400);
         return res.end();
       }
-      let reply = '';
+      let reply: string | null = '';
       try {
         reply = core.handleEvent(ev, res);
       } catch (e) {
@@ -58,8 +59,8 @@ function startServer(core) {
   server.headersTimeout = 10000;
 
   return new Promise((resolve, reject) => {
-    const tryPort = (port, attempts) => {
-      server.once('error', (e) => {
+    const tryPort = (port: number, attempts: number) => {
+      server.once('error', (e: NodeJS.ErrnoException) => {
         if (e.code === 'EADDRINUSE' && attempts > 0) tryPort(port + 1, attempts - 1);
         else reject(e);
       });
@@ -72,11 +73,10 @@ function startServer(core) {
   });
 }
 
-function clearConfig() {
+export function clearConfig() {
   try {
     const cfg = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
     if (cfg.pid === process.pid) fs.unlinkSync(CONFIG);
   } catch {}
 }
 
-module.exports = { startServer, clearConfig, DIR };

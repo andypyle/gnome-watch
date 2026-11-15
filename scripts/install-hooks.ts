@@ -4,11 +4,15 @@
 // including sessions in the VS Code extension. A backup is written first.
 // Re-running is safe: old Gnome Watch entries are replaced, nothing else is touched.
 
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
-const MARKER = 'gnome-hook.js';
+// The shape of ~/.claude/settings.json "hooks", only as far as we touch it.
+interface HookEntry { matcher?: string; hooks?: { type?: string; command?: string; timeout?: number }[] }
+export type Settings = { hooks?: Record<string, HookEntry[]>; [key: string]: unknown };
+
+export const MARKER = 'gnome-hook.js';
 const hookPath = path.resolve(__dirname, '..', 'hook', 'gnome-hook.js');
 // Use the absolute path to this Node binary: apps launched from the Dock (like VS Code)
 // often don't have Homebrew/nvm folders on their PATH, so a bare `node` can fail there.
@@ -17,8 +21,7 @@ const command = `"${process.execPath}" "${hookPath}"`;
 const settingsDir = path.join(os.homedir(), '.claude');
 const settingsFile = path.join(settingsDir, 'settings.json');
 
-// event -> { matcher?, timeout }
-const EVENTS = {
+const EVENTS: Record<string, { matcher?: string; timeout: number }> = {
   SessionStart: { timeout: 10 },
   SessionEnd: { timeout: 10 },
   UserPromptSubmit: { timeout: 10 },
@@ -34,7 +37,7 @@ const EVENTS = {
   PostModelSwitch: { timeout: 10 }, // keeps the model label current after /model
 };
 
-function stripOurs(entries) {
+export function stripOurs(entries: HookEntry[] | undefined): HookEntry[] {
   return (entries || [])
     .map((e) => ({ ...e, hooks: (e.hooks || []).filter((h) => !String(h.command || '').includes(MARKER)) }))
     .filter((e) => e.hooks.length > 0);
@@ -42,16 +45,16 @@ function stripOurs(entries) {
 
 function main() {
   fs.mkdirSync(settingsDir, { recursive: true });
-  let settings = {};
+  let settings: Settings = {};
   if (fs.existsSync(settingsFile)) {
     const raw = fs.readFileSync(settingsFile, 'utf8');
     try {
       settings = raw.trim() ? JSON.parse(raw) : {};
     } catch (e) {
-      console.error(`Couldn't parse ${settingsFile}: ${e.message}\nFix the JSON (or move the file aside) and run this again.`);
+      console.error(`Couldn't parse ${settingsFile}: ${(e as Error).message}\nFix the JSON (or move the file aside) and run this again.`);
       process.exit(1);
     }
-    const backup = `${settingsFile}.gnome-watch-backup-${Date.now()}`;
+    const backup = `${settingsFile}.gnome-watch-backup`; // one file, replaced each run: the state before the last change
     fs.writeFileSync(backup, raw);
     console.log(`Backed up existing settings to ${backup}`);
   }
@@ -59,7 +62,7 @@ function main() {
   settings.hooks = settings.hooks || {};
   for (const [event, opt] of Object.entries(EVENTS)) {
     const entries = stripOurs(settings.hooks[event]);
-    const entry = { hooks: [{ type: 'command', command, timeout: opt.timeout }] };
+    const entry: HookEntry = { hooks: [{ type: 'command', command, timeout: opt.timeout }] };
     if (opt.matcher) entry.matcher = opt.matcher;
     entries.push(entry);
     settings.hooks[event] = entries;
@@ -71,4 +74,3 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { stripOurs, MARKER };

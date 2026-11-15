@@ -1,7 +1,7 @@
 // Capybara pack. Same tools and poses as the gnomes; each capybara wears a scarf in its own
 // color (that's also its progress-bar color) and has its own little head accessory.
 (function () {
-  const { toolSVG } = window.packTools;
+  const { toolSVG, toolAngleFor } = window.packTools;
 
   const FUR = '#b07a4c';
   const FUR_DARK = '#8c5b34';
@@ -18,8 +18,9 @@
     { name: 'Tofu', role: 'the Night Owl', hat: '#159a9c', tool: 'lantern', extra: 'nightcap' },
     { name: 'Maple', role: 'the Digger', hat: '#c9a227', tool: 'shovel', extra: 'leaf' },
   ];
+  type Char = (typeof CHARACTERS)[number];
 
-  function extraSVG(extra, c) {
+  function extraSVG(extra: string, c: Char): string {
     switch (extra) {
       case 'yuzu': // the classic capybara hat
         return `<circle cx="24" cy="10.4" r="4.4" fill="#f6b82e"/><circle cx="22.6" cy="9" r="1.1" fill="#ffe08a" opacity=".8"/>
@@ -58,8 +59,8 @@
     }
   }
 
-  function draw(c, size) {
-    const toolAngle = { can: 0, lantern: 0, magnifier: 10 }[c.tool] ?? 18;
+  function draw(c: Char, size: number): string {
+    const toolAngle = toolAngleFor(c.tool);
     return `
 <svg class="gnome-svg tool-${c.tool}" viewBox="0 0 48 56" width="${size}" height="${(size * 56) / 48}" aria-hidden="true">
   <ellipse class="g-shadow" cx="24" cy="53" rx="14" ry="2.5"/>

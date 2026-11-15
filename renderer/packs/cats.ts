@@ -1,7 +1,7 @@
 // Cat pack. Same tools and poses as the gnomes; every cat has its own coat, and a collar in its
 // own color (that's also its progress-bar color). Tails swish while they work.
 (function () {
-  const { toolSVG } = window.packTools;
+  const { toolSVG, toolAngleFor } = window.packTools;
   const INK = '#2a2024';
   const OUTLINE = 'rgba(60, 40, 30, 0.18)'; // keeps light coats readable on light backgrounds
   const PINK = '#f2a7b5';
@@ -24,6 +24,7 @@
     { name: 'Toffee', role: 'the Digger', hat: '#c9a227', tool: 'shovel',
       coat: { fur: '#efe3cf', mark: '#5b4636', chest: '#f8f0e2', paw: '#5b4636', eye: '#5d9fe0', pattern: 'siamese' } },
   ];
+  type Char = (typeof CHARACTERS)[number];
 
   // Cat-only animation: tails swish (faster while working, slow while idle, still while napping).
   const css = document.createElement('style');
@@ -36,7 +37,7 @@
   `;
   document.head.appendChild(css);
 
-  function markings(k) {
+  function markings(k: Char['coat']): string {
     switch (k.pattern) {
       case 'tabby':
         return `<path d="M21.6 17.4 L22.2 20.4 M24 16.8 L24 20.2 M26.4 17.4 L25.8 20.4" stroke="${k.mark}" stroke-width="1.3" stroke-linecap="round"/>
@@ -51,7 +52,7 @@
     }
   }
 
-  function bodyMarkings(k) {
+  function bodyMarkings(k: Char['coat']): string {
     if (k.pattern === 'tabby')
       return `<path d="M15.4 41 Q17.4 41.6 18.2 43.4 M14.8 45 Q16.8 45.4 17.6 47 M32.6 41 Q30.6 41.6 29.8 43.4 M33.2 45 Q31.2 45.4 30.4 47" stroke="${k.mark}" stroke-width="1.2" fill="none" stroke-linecap="round"/>`;
     if (k.pattern === 'calico')
@@ -60,9 +61,9 @@
     return '';
   }
 
-  function draw(c, size) {
+  function draw(c: Char, size: number): string {
     const k = c.coat;
-    const toolAngle = { can: 0, lantern: 0, magnifier: 10 }[c.tool] ?? 18;
+    const toolAngle = toolAngleFor(c.tool);
     const earColor = k.pattern === 'siamese' ? k.mark : k.fur;
     const tailColor = k.pattern === 'siamese' ? k.mark : k.pattern === 'calico' ? k.mark2 : k.fur;
     const muzzle = k.pattern === 'tuxedo' || k.pattern === 'calico' ? '#ffffff' : k.chest;

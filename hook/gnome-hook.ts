@@ -10,17 +10,18 @@
 // If Gnome Watch isn't running, this exits silently, so Claude Code behaves
 // exactly as if the hook weren't installed.
 
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const http = require('http');
-const { execFileSync } = require('child_process');
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as http from 'http';
+import { execFileSync } from 'child_process';
 
 // Find the Claude Code process that ran this hook (skipping any shell in between), so the app
 // can tell when a session's process has exited even if no SessionEnd event arrives.
-function claudePid() {
+// Returns null when unsure: a wrong pid (e.g. the short-lived shell) would get a live agent swept away.
+function claudePid(): number | null {
   let pid = process.ppid;
-  if (process.platform === 'win32') return pid;
+  if (process.platform === 'win32') return null; // no ps; the parent may be a shell that exits right away
   try {
     for (let i = 0; i < 4; i++) {
       const out = execFileSync('ps', ['-o', 'ppid=,comm=', '-p', String(pid)], { encoding: 'utf8', timeout: 800 }).trim();
@@ -33,7 +34,7 @@ function claudePid() {
       return pid;
     }
   } catch {}
-  return pid;
+  return null;
 }
 
 const CONFIG = path.join(os.homedir(), '.gnome-watch', 'server.json');
@@ -44,21 +45,21 @@ process.stdin.on('data', (d) => (input += d));
 process.stdin.on('end', run);
 
 function run() {
-  let cfg;
+  let cfg: { port: number; token: string };
   try {
     cfg = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
   } catch {
     return process.exit(0); // app not running / never started
   }
 
-  let ev;
+  let ev: { hook_event_name?: string; tool_name?: string; _claude_pid?: number | null };
   try {
     ev = JSON.parse(input);
   } catch {
     return process.exit(0);
   }
 
-  if (['SessionStart', 'UserPromptSubmit', 'Stop'].includes(ev.hook_event_name)) {
+  if (['SessionStart', 'UserPromptSubmit', 'Stop'].includes(ev.hook_event_name || '')) {
     ev._claude_pid = claudePid();
     input = JSON.stringify(ev);
   }
@@ -83,7 +84,7 @@ function run() {
     (res) => {
       let body = '';
       res.setEncoding('utf8');
-      res.on('data', (d) => (body += d));
+      res.on('data', (d: string) => (body += d));
       res.on('end', () => {
         if (res.statusCode === 200 && body.trim()) process.stdout.write(body);
         process.exit(0);

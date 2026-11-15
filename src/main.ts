@@ -1,19 +1,21 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const { createCore } = require('./core');
-const { startServer, clearConfig, DIR } = require('./server');
-const { watchFocus } = require('./focus');
+import { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
+import { createCore } from './core';
+import { startServer, clearConfig, DIR } from './server';
+import { watchFocus, type Focus } from './focus';
+import type { ResolveAction } from '../renderer/types';
 
 const TOP = 16; // gap under the menu bar
 const PREFS = path.join(DIR, 'prefs.json');
 
-let win = null;
-let tray = null;
-let focus = 'unknown'; // 'editor' | 'other' | 'unknown'
-let manual = null; // null = follow VS Code automatically; true/false = you clicked to expand/minimize
+type Mode = 'auto' | 'expanded' | 'hidden';
+let win: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let focus: Focus = 'unknown';
+let manual: boolean | null = null; // null = follow VS Code automatically; true/false = you clicked to expand/minimize
 let lastPendingCount = 0;
-let prefs = { mode: 'auto', sound: true, pack: 'gnomes' }; // mode: 'auto' | 'expanded' | 'hidden'
+let prefs: { mode: Mode; sound: boolean; pack: string } = { mode: 'auto', sound: true, pack: 'gnomes' };
 const PACKS = [
   { id: 'gnomes', label: 'Gnomes' },
   { id: 'capybaras', label: 'Capybaras' },
@@ -25,23 +27,14 @@ const PACKS = [
 try {
   prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS, 'utf8')) };
 } catch {}
-// Older "Always show" meant "always visible", which the drawer now always is.
-if (prefs.mode === 'always') {
-  prefs.mode = 'auto';
-  try {
-    fs.writeFileSync(PREFS, JSON.stringify(prefs, null, 2));
-  } catch {}
-}
 const savePrefs = () => {
   try {
     fs.writeFileSync(PREFS, JSON.stringify(prefs, null, 2));
   } catch {}
 };
 
-// Only hold a prompt for the widget when you're away from the editor.
-// In VS Code, Claude Code's own dialog appears as usual.
 const AGENTS_FILE = path.join(DIR, 'agents.json');
-let saveTimer = null;
+let saveTimer: NodeJS.Timeout | undefined;
 const saveAgents = () => {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
@@ -56,6 +49,8 @@ const core = createCore({
     refresh();
     saveAgents();
   },
+  // Only hold a prompt for the widget when you're away from the editor.
+  // In VS Code, Claude Code's own dialog appears as usual.
   shouldHold: () => prefs.mode !== 'hidden' && focus !== 'editor',
 });
 
@@ -105,15 +100,17 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  win.setAlwaysOnTop(true, 'floating');
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  win.webContents.on('did-finish-load', refresh);
+  const w0 = win;
+  w0.setAlwaysOnTop(true, 'floating');
+  w0.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // getAppPath() is the repo root (or the packaged app): HTML/CSS live in renderer/, compiled JS in out/.
+  w0.loadFile(path.join(app.getAppPath(), 'renderer', 'index.html'));
+  w0.webContents.on('did-finish-load', refresh);
   // You can drag the drawer up or down; it always snaps back to the right edge.
-  win.on('moved', () => setSize(win.getBounds().width, win.getBounds().height));
+  w0.on('moved', () => setSize(w0.getBounds().width, w0.getBounds().height));
 }
 
-function setSize(width, height) {
+function setSize(width: number, height: number) {
   if (!win || win.isDestroyed()) return;
   const { workArea } = screen.getDisplayMatching(win.getBounds());
   const w = Math.ceil(width);
@@ -126,7 +123,7 @@ function setSize(width, height) {
 }
 
 function makeTrayIcon() {
-  const img = nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'tray.png'));
+  const img = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'tray.png'));
   return img.resize({ width: 18, height: 18 });
 }
 
@@ -136,7 +133,7 @@ function updateTray(snap = core.snapshot()) {
   const working = snap.agents.filter((a) => a.status === 'working').length;
   tray.setToolTip(`Gnome Watch: ${working} working, ${waiting} need you`);
   if (process.platform === 'darwin') tray.setTitle(waiting ? ` ${waiting}` : '');
-  const setMode = (mode) => () => {
+  const setMode = (mode: Mode) => () => {
     prefs.mode = mode;
     manual = null;
     savePrefs();
@@ -189,29 +186,32 @@ function updateTray(snap = core.snapshot()) {
   );
 }
 
-ipcMain.on('resize', (_e, { width, height }) => setSize(width, height));
+ipcMain.on('resize', (_e, { width, height }: { width: number; height: number }) => setSize(width, height));
 
 ipcMain.on('toggle', () => {
   manual = !isExpanded(); // stays this way until you next switch to or away from VS Code
   refresh();
 });
 
-ipcMain.on('resolve', (_e, { id, action, answers }) => core.resolve(id, action, answers));
+ipcMain.on('resolve', (_e, { id, action, answers }: { id: string; action: ResolveAction; answers?: Record<string, string> }) =>
+  core.resolve(id, action, answers)
+);
 
-ipcMain.on('open-editor', (_e, sessionId) => {
+ipcMain.on('open-editor', (_e, sessionId: string) => {
   const a = core.agents.get(sessionId);
-  // Hand any held prompts back so they appear in VS Code.
-  for (const p of [...core.pending.values()]) if (p.sessionId === sessionId) core.release(p.id);
+  core.releaseSession(sessionId); // hand any held prompts back so they appear in VS Code
   if (a && a.cwd) {
     const p = a.cwd.replace(/\\/g, '/');
-    shell.openExternal(`vscode://file/${encodeURI(p.startsWith('/') ? p.slice(1) : p)}`);
+    // Encode each segment: encodeURI leaves '#' and '?' alone, which cut the path short.
+    const encoded = (p.startsWith('/') ? p.slice(1) : p).split('/').map(encodeURIComponent).join('/');
+    shell.openExternal(`vscode://file/${encoded}`);
   } else {
     shell.openExternal('vscode://');
   }
 });
 
 app.whenReady().then(async () => {
-  if (process.platform === 'darwin') app.dock.hide();
+  if (process.platform === 'darwin') app.dock?.hide();
   try {
     await startServer(core);
   } catch (e) {
@@ -229,7 +229,7 @@ app.whenReady().then(async () => {
   // Log what the focus check sees (only when it changes) to ~/.gnome-watch/focus.log
   const FOCUS_LOG = path.join(DIR, 'focus.log');
   let lastDetail = '';
-  const logFocus = (d) => {
+  const logFocus = (d: object) => {
     const line = JSON.stringify(d);
     if (line === lastDetail) return;
     lastDetail = line;
@@ -248,12 +248,12 @@ app.whenReady().then(async () => {
   }, logFocus);
 
   // Every 20s: drop agents whose Claude Code process is gone, settle ones stuck on "working".
-  const isAlive = (pid) => {
+  const isAlive = (pid: number) => {
     try {
       process.kill(pid, 0);
       return true;
     } catch (e) {
-      return e.code === 'EPERM';
+      return (e as NodeJS.ErrnoException).code === 'EPERM';
     }
   };
   core.sweep(isAlive);
@@ -264,7 +264,7 @@ app.whenReady().then(async () => {
 });
 
 if (!app.requestSingleInstanceLock()) app.quit();
-app.on('window-all-closed', (e) => e.preventDefault());
+app.on('window-all-closed', () => {}); // subscribing keeps the app running with no windows
 app.on('before-quit', () => {
   try {
     fs.writeFileSync(AGENTS_FILE, JSON.stringify(core.serialize()));

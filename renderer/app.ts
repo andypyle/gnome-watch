@@ -1,4 +1,19 @@
-const api = window.gnome || {
+type State = import('./types').State;
+type AgentView = State['agents'][number];
+type PendingView = AgentView['pending'][number];
+type Character = import('./types').Character;
+interface Question { question: string; header?: string; multiSelect?: boolean; options?: { label: string; description?: string }[] }
+interface Row {
+  el: HTMLDivElement;
+  refs: Record<'bubble' | 'name' | 'status' | 'model' | 'task' | 'count', HTMLSpanElement> &
+    Record<'activity' | 'bar' | 'fill' | 'helpers' | 'prompts', HTMLDivElement>;
+  cards: Map<string, HTMLDivElement>;
+  helperEls?: Map<string, HelperItem>;
+}
+type HelperItem = HTMLDivElement & { _refs: { label: HTMLSpanElement; act: HTMLSpanElement } };
+interface Mini { el: HTMLDivElement; fill: HTMLDivElement; bubble: HTMLSpanElement; who: Character; helperBox?: HTMLDivElement; helperEls?: Map<string, HTMLDivElement> }
+
+const api: import('./types').GnomeApi = window.gnome || {
   // Lets you open index.html in a normal browser for design work.
   onState: () => {},
   resize: () => {},
@@ -8,32 +23,33 @@ const api = window.gnome || {
 };
 
 const SLEEP_AFTER_MS = 20 * 60 * 1000;
-const STATUS_LABEL = { working: 'Working', waiting: 'Needs you', done: 'Done', idle: 'Idle', sleeping: 'Napping', ended: 'Closed' };
-const BUBBLE = { waiting: '!', done: '✓', sleeping: 'z' };
+const STATUS_LABEL: Record<string, string> = { working: 'Working', waiting: 'Needs you', done: 'Done', idle: 'Idle', sleeping: 'Napping', ended: 'Closed' };
+const BUBBLE: Record<string, string> = { waiting: '!', done: '✓', sleeping: 'z' };
 
 // Each gnome carries its own state, so a helper inside a finished row can still be working.
-function setGnomeState(container, st) {
+function setGnomeState(container: Element | null, st: string) {
   const svg = container && container.querySelector(':scope > .gnome-svg, :scope > .avatar > .gnome-svg, :scope > .helper-avatar > .gnome-svg, :scope > .row > .avatar > .gnome-svg');
   if (!svg) return;
   for (const c of [...svg.classList]) if (c.startsWith('st-')) svg.classList.remove(c);
   svg.classList.add(`st-${st}`);
 }
 
+const byId = (id: string) => document.getElementById(id)!;
 const els = {
-  panel: document.getElementById('panel'),
-  tab: document.getElementById('tab'),
-  agents: document.getElementById('agents'),
-  empty: document.getElementById('empty'),
-  summary: document.getElementById('summary'),
+  panel: byId('panel'),
+  tab: byId('tab'),
+  agents: byId('agents'),
+  empty: byId('empty'),
+  summary: byId('summary'),
 };
-const rows = new Map(); // agentId -> { el, refs, cards: Map(pendingId -> el) }
-const minis = new Map(); // agentId -> { el, fill, bubble }
-const seenPending = new Set();
-let latest = null;
+const rows = new Map<string, Row>(); // agentId -> row
+const minis = new Map<string, Mini>(); // agentId -> its little gnome on the tab
+const seenPending = new Set<string>();
+let latest: State | null = null;
 
-document.getElementById('minimize').onclick = () => api.toggle();
+byId('minimize').onclick = () => api.toggle();
 els.tab.onclick = () => api.toggle();
-document.getElementById('collapse').onclick = () => {
+byId('collapse').onclick = () => {
   document.body.classList.toggle('compact');
   try { localStorage.setItem('compact', document.body.classList.contains('compact') ? '1' : ''); } catch {}
 };
@@ -51,7 +67,7 @@ function measure() {
 new ResizeObserver(measure).observe(els.panel);
 new ResizeObserver(measure).observe(els.tab);
 
-function setExpanded(expand) {
+function setExpanded(expand: boolean) {
   if (expand === panelShown && !document.body.classList.contains('collapsing')) return;
   const t = ++transition;
   if (expand) {
@@ -75,30 +91,28 @@ function setExpanded(expand) {
   }
 }
 
-function renderMiniHelpers(m, a) {
-  if (!m.helperBox) {
-    m.helperBox = h('div', 'mini-helpers');
-    m.helperEls = new Map();
-    m.el.appendChild(m.helperBox);
-  }
+function renderMiniHelpers(m: Mini, a: AgentView) {
+  if (!m.helperBox) m.el.appendChild((m.helperBox = h('div', 'mini-helpers')));
+  const helperEls = (m.helperEls ??= new Map());
+  const box = m.helperBox;
   const ids = new Set(a.helpers.map((x) => x.id));
-  for (const [id, el] of m.helperEls) if (!ids.has(id)) { el.remove(); m.helperEls.delete(id); }
+  for (const [id, el] of helperEls) if (!ids.has(id)) { el.remove(); helperEls.delete(id); }
   a.helpers.forEach((hp, i) => {
-    let el = m.helperEls.get(hp.id);
+    let el = helperEls.get(hp.id);
     if (!el) {
       el = h('div', 'mini-helper');
       el.innerHTML = window.gnomeSVG(window.helperSlot(hp.type, a.slot), 22);
-      m.helperEls.set(hp.id, el);
+      helperEls.set(hp.id, el);
     }
     el.className = `mini-helper ${hp.status === 'done' ? 'done' : 'working'}`;
     setGnomeState(el, hp.status === 'done' ? 'done' : 'working');
     el.title = `${hp.label}: ${hp.activity}`;
-    if (m.helperBox.children[i] !== el) m.helperBox.insertBefore(el, m.helperBox.children[i] || null);
+    if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
   });
 }
 
-let placeholder = null;
-function renderTab(agents) {
+let placeholder: HTMLDivElement | null = null;
+function renderTab(agents: AgentView[]) {
   // With no agents, show a single napping gnome so you know the widget is running.
   if (!agents.length) {
     if (!placeholder) {
@@ -142,19 +156,19 @@ function renderTab(agents) {
   });
 }
 
-function h(tag, cls, text) {
+function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
 }
 
-function displayStatus(a) {
+function displayStatus(a: AgentView): string {
   if ((a.status === 'idle' || a.status === 'done') && Date.now() - a.lastEvent > SLEEP_AFTER_MS) return 'sleeping';
   return a.status;
 }
 
-function makeRow(a) {
+function makeRow(a: AgentView): Row {
   const el = h('div', 'agent');
   const row = h('div', 'row');
   const avatar = h('div', 'avatar');
@@ -193,7 +207,7 @@ function makeRow(a) {
   return { el, refs: { bubble, name, status, activity, model, bar, fill, task, count, helpers, prompts }, cards: new Map() };
 }
 
-function updateRow(r, a) {
+function updateRow(r: Row, a: AgentView) {
   const st = displayStatus(a);
   r.el.className = `agent ${st}`;
   setGnomeState(r.el, st);
@@ -235,12 +249,12 @@ function updateRow(r, a) {
 }
 
 // Each helper gets a small row of its own under the agent that sent it.
-function renderHelperRows(r, a) {
-  r.helperEls = r.helperEls || new Map();
+function renderHelperRows(r: Row, a: AgentView) {
+  const helperEls = (r.helperEls ??= new Map<string, HelperItem>());
   const ids = new Set(a.helpers.map((x) => x.id));
-  for (const [id, el] of r.helperEls) if (!ids.has(id)) { el.remove(); r.helperEls.delete(id); }
+  for (const [id, el] of helperEls) if (!ids.has(id)) { el.remove(); helperEls.delete(id); }
   a.helpers.forEach((hp, i) => {
-    let item = r.helperEls.get(hp.id);
+    let item = helperEls.get(hp.id);
     if (!item) {
       const slot = window.helperSlot(hp.type, a.slot);
       const el = h('div', 'helper-row');
@@ -252,9 +266,8 @@ function renderHelperRows(r, a) {
       const act = h('span', 'helper-activity');
       text.append(label, act);
       el.append(av, text);
-      item = el;
-      item._refs = { label, act };
-      r.helperEls.set(hp.id, item);
+      item = Object.assign(el, { _refs: { label, act } });
+      helperEls.set(hp.id, item);
     }
     item.className = `helper-row ${hp.status === 'done' ? 'done' : 'working'}`;
     setGnomeState(item, hp.status === 'done' ? 'done' : 'working');
@@ -265,7 +278,7 @@ function renderHelperRows(r, a) {
   });
 }
 
-function previewFor(p) {
+function previewFor(p: PendingView): string {
   const i = p.toolInput || {};
   if (p.toolName === 'Bash') return i.command || '';
   if (i.file_path) {
@@ -277,7 +290,7 @@ function previewFor(p) {
   return s.length > 700 ? s.slice(0, 700) + '…' : s;
 }
 
-function permissionCard(a, p) {
+function permissionCard(a: AgentView, p: PendingView) {
   const card = h('div', 'card');
   card.append(h('div', 'chip', 'Permission'));
   card.append(h('h4', null, `${a.name} wants to use ${p.toolName}`));
@@ -295,14 +308,14 @@ function permissionCard(a, p) {
   return card;
 }
 
-function questionCard(a, p) {
-  const questions = (p.toolInput && p.toolInput.questions) || [];
-  const answers = {}; // question text -> Set of labels | string
+function questionCard(a: AgentView, p: PendingView) {
+  const questions: Question[] = (p.toolInput && p.toolInput.questions) || [];
+  const answers: Record<string, Set<string> | string> = {}; // question text -> chosen labels, or typed text
   const multi = questions.length > 1;
   const card = h('div', 'card');
   card.append(h('div', 'chip', `${a.name} asks`));
 
-  const answered = (q) => {
+  const answered = (q: Question) => {
     const v = answers[q.question];
     return !!(v && (typeof v === 'string' ? v.trim() : v.size));
   };
@@ -313,14 +326,14 @@ function questionCard(a, p) {
   const viewport = h('div', 'q-viewport');
   const track = h('div', 'q-track');
   viewport.append(track);
-  const panes = [];
-  const tabEls = [];
+  const panes: HTMLDivElement[] = [];
+  const tabEls: HTMLButtonElement[] = [];
   let current = 0;
 
   const submit = h('button', 'btn', multi ? 'Send answers' : 'Send answer');
   const next = h('button', 'btn secondary', 'Next →');
 
-  function go(i) {
+  function go(i: number) {
     current = Math.max(0, Math.min(questions.length - 1, i));
     track.style.transform = `translateX(-${current * 100}%)`; // forward slides right-to-left
     tabEls.forEach((t, j) => t.classList.toggle('active', j === current));
@@ -348,6 +361,7 @@ function questionCard(a, p) {
       const t = h('button', 'q-tab');
       t.append(h('span', 'q-num', String(i + 1)), h('span', 'q-label', q.header || `Question ${i + 1}`));
       t.title = q.header ? `${q.header}: ${q.question}` : q.question;
+      t.setAttribute('aria-label', q.header || `Question ${i + 1}`); // the visible text can be just a ✓
       t.onclick = () => go(i);
       tabEls.push(t);
       tabs.append(t);
@@ -356,7 +370,7 @@ function questionCard(a, p) {
     if (!multi && q.header) pane.append(h('div', 'chip', q.header));
     pane.append(h('div', 'qtext', q.question));
     const opts = h('div', 'opts');
-    const buttons = [];
+    const buttons: HTMLButtonElement[] = [];
     const other = h('input', 'other');
     other.placeholder = 'Something else…';
     (q.options || []).forEach((o) => {
@@ -401,7 +415,7 @@ function questionCard(a, p) {
 
   next.onclick = () => go(current + 1);
   submit.onclick = () => {
-    const out = {};
+    const out: Record<string, string> = {};
     for (const q of questions) {
       const v = answers[q.question];
       out[q.question] = typeof v === 'string' ? v.trim() : [...v].join(', ');
@@ -420,28 +434,28 @@ function questionCard(a, p) {
   return card;
 }
 
-let audioCtx = null;
+let audioCtx: AudioContext | null = null;
 function chime() {
   try {
-    audioCtx = audioCtx || new AudioContext();
-    const t = audioCtx.currentTime;
+    const ctx = (audioCtx ??= new AudioContext());
+    const t = ctx.currentTime;
     [660, 880].forEach((f, i) => {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
       o.type = 'sine';
       o.frequency.value = f;
       g.gain.setValueAtTime(0.0001, t + i * 0.12);
       g.gain.exponentialRampToValueAtTime(0.12, t + i * 0.12 + 0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.35);
-      o.connect(g).connect(audioCtx.destination);
+      o.connect(g).connect(ctx.destination);
       o.start(t + i * 0.12);
       o.stop(t + i * 0.12 + 0.4);
     });
   } catch {}
 }
 
-let currentPack = null;
-function render(state) {
+let currentPack: string | null = null;
+function render(state: State) {
   // Switching packs redraws everything from scratch (main sends the state again on reload).
   const wantPack = state.pack || 'gnomes';
   if (currentPack === null) {

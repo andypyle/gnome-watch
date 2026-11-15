@@ -1,0 +1,158 @@
+{
+  "hook/gnome-hook.ts": {
+    "mtime": 1794766439.1063786,
+    "seen": 1794772655.342072,
+    "ast_hash": "5a13c324c44e4d9fa3003c4ce9480a7b",
+    "semantic_hash": "5a13c324c44e4d9fa3003c4ce9480a7b"
+  },
+  "package.json": {
+    "mtime": 1794766263.659868,
+    "seen": 1794772655.3420749,
+    "ast_hash": "f49d8cee33c98f0cb0aa1234f4fc361b",
+    "semantic_hash": "f49d8cee33c98f0cb0aa1234f4fc361b"
+  },
+  "renderer/app.ts": {
+    "mtime": 1794766859.6522057,
+    "seen": 1794772655.3420758,
+    "ast_hash": "833a18be03d1aa14579ee1ad82c86eab",
+    "semantic_hash": "833a18be03d1aa14579ee1ad82c86eab"
+  },
+  "renderer/gnome.ts": {
+    "mtime": 1794766346.4741018,
+    "seen": 1794772655.342077,
+    "ast_hash": "05b763f4b1fdad10f733df4e0342176b",
+    "semantic_hash": "05b763f4b1fdad10f733df4e0342176b"
+  },
+  "renderer/packs/bats.ts": {
+    "mtime": 1794766360.7643232,
+    "seen": 1794772655.342078,
+    "ast_hash": "734a817a526c2a7736f4120ab637efc7",
+    "semantic_hash": "734a817a526c2a7736f4120ab637efc7"
+  },
+  "renderer/packs/bigfoot.ts": {
+    "mtime": 1794766360.7648418,
+    "seen": 1794772655.342079,
+    "ast_hash": "b87e2abbbb1b7f4f5ba26bcc01338785",
+    "semantic_hash": "b87e2abbbb1b7f4f5ba26bcc01338785"
+  },
+  "renderer/packs/capybaras.ts": {
+    "mtime": 1794766360.7652135,
+    "seen": 1794772655.34208,
+    "ast_hash": "9809ff4f5e046913b1808d2886f47ab7",
+    "semantic_hash": "9809ff4f5e046913b1808d2886f47ab7"
+  },
+  "renderer/packs/cats.ts": {
+    "mtime": 1794766360.7655742,
+    "seen": 1794772655.342082,
+    "ast_hash": "d31aa69c560cd93c54857fa80b132c59",
+    "semantic_hash": "d31aa69c560cd93c54857fa80b132c59"
+  },
+  "renderer/types.d.ts": {
+    "mtime": 1794766346.4743354,
+    "seen": 1794772655.342083,
+    "ast_hash": "66ffa63c05c6c74bc678d1834aecde88",
+    "semantic_hash": "66ffa63c05c6c74bc678d1834aecde88"
+  },
+  "scripts/install-hooks.ts": {
+    "mtime": 1794766874.567253,
+    "seen": 1794772655.3420842,
+    "ast_hash": "da6e01b005f93574595f843935925d45",
+    "semantic_hash": "da6e01b005f93574595f843935925d45"
+  },
+  "scripts/install-mac.sh": {
+    "mtime": 1794709760.2522652,
+    "seen": 1794772655.3420842,
+    "ast_hash": "b8606fc94a161922081eba37cc68a5d3",
+    "semantic_hash": "b8606fc94a161922081eba37cc68a5d3"
+  },
+  "scripts/uninstall-hooks.ts": {
+    "mtime": 1794766874.5674276,
+    "seen": 1794772655.3420851,
+    "ast_hash": "e71263f8b37c40ce1314c213d380f92d",
+    "semantic_hash": "e71263f8b37c40ce1314c213d380f92d"
+  },
+  "src/core.ts": {
+    "mtime": 1794766859.6493707,
+    "seen": 1794772655.3420858,
+    "ast_hash": "34e279fc19c801e7aacef303321a1fa1",
+    "semantic_hash": "34e279fc19c801e7aacef303321a1fa1"
+  },
+  "src/focus.ts": {
+    "mtime": 1794766336.0825617,
+    "seen": 1794772655.342087,
+    "ast_hash": "34bbfaa113e43589a1a24668f7b95c71",
+    "semantic_hash": "34bbfaa113e43589a1a24668f7b95c71"
+  },
+  "src/main.ts": {
+    "mtime": 1794766874.5668905,
+    "seen": 1794772655.342087,
+    "ast_hash": "dc47cd8b550dae02875ac6d66fd53e00",
+    "semantic_hash": "dc47cd8b550dae02875ac6d66fd53e00"
+  },
+  "src/preload.ts": {
+    "mtime": 1794766316.8880482,
+    "seen": 1794772655.342088,
+    "ast_hash": "8e1f185d084a3ada62d036aee74009e3",
+    "semantic_hash": "8e1f185d084a3ada62d036aee74009e3"
+  },
+  "src/server.ts": {
+    "mtime": 1794766316.887715,
+    "seen": 1794772655.342089,
+    "ast_hash": "dbf9a7e149c88591eb664bf2338c2155",
+    "semantic_hash": "dbf9a7e149c88591eb664bf2338c2155"
+  },
+  "test/core.test.ts": {
+    "mtime": 1794766874.5678067,
+    "seen": 1794772655.342089,
+    "ast_hash": "d4124f3de224dd8abab59e273d0306d7",
+    "semantic_hash": "d4124f3de224dd8abab59e273d0306d7"
+  },
+  "tsconfig.json": {
+    "mtime": 1794766560.7009163,
+    "seen": 1794772655.34209,
+    "ast_hash": "a8ebef2e0021124211aaadf86c801d53",
+    "semantic_hash": "a8ebef2e0021124211aaadf86c801d53"
+  },
+  "CLAUDE.md": {
+    "mtime": 1794766603.4970405,
+    "seen": 1794772655.342091,
+    "ast_hash": "e166666cd499e39dd66d172fefe654a1",
+    "semantic_hash": "e166666cd499e39dd66d172fefe654a1"
+  },
+  "README.md": {
+    "mtime": 1794766587.6358495,
+    "seen": 1794772655.342091,
+    "ast_hash": "0e1e1da9ca3aaab1db6784e826723336",
+    "semantic_hash": "0e1e1da9ca3aaab1db6784e826723336"
+  },
+  "renderer/index.html": {
+    "mtime": 1794766502.5237656,
+    "seen": 1794772655.342092,
+    "ast_hash": "697cb9459185d862f652bc296a10298d",
+    "semantic_hash": "697cb9459185d862f652bc296a10298d"
+  },
+  "assets/tray.png": {
+    "mtime": 1794705458.212252,
+    "seen": 1794772655.342093,
+    "ast_hash": "7c3816a9f128822237d72aede3d180e1",
+    "semantic_hash": "7c3816a9f128822237d72aede3d180e1"
+  },
+  "docs/character-packs.png": {
+    "mtime": 1794709262.8097715,
+    "seen": 1794772655.342093,
+    "ast_hash": "4afc3a0f574e1eed8cfbc4b2ab87f856",
+    "semantic_hash": "4afc3a0f574e1eed8cfbc4b2ab87f856"
+  },
+  "docs/drawer.png": {
+    "mtime": 1794708559.1442685,
+    "seen": 1794772655.3420942,
+    "ast_hash": "42e63806a98ff767e89d867a7b17f7c9",
+    "semantic_hash": "42e63806a98ff767e89d867a7b17f7c9"
+  },
+  "docs/prompts.png": {
+    "mtime": 1794708559.7177534,
+    "seen": 1794772655.3420951,
+    "ast_hash": "33fa6ba8a57a8ae22fd1c61335fa2ba1",
+    "semantic_hash": "33fa6ba8a57a8ae22fd1c61335fa2ba1"
+  }
+}

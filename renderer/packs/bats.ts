@@ -1,7 +1,7 @@
 // Bat pack. Same tools and poses as the gnomes; each bat wears a bow tie in its own color
 // (that's also its progress-bar color). Napping bats hang upside down from a branch.
 (function () {
-  const { toolSVG } = window.packTools;
+  const { toolSVG, toolAngleFor } = window.packTools;
 
   const FUR = '#6e5c80';
   const FUR_DARK = '#57476a';
@@ -22,6 +22,7 @@
     { name: 'Luna', role: 'the Night Owl', hat: '#159a9c', tool: 'lantern', extra: 'moon' },
     { name: 'Dusk', role: 'the Digger', hat: '#c9a227', tool: 'shovel', extra: 'star' },
   ];
+  type Char = (typeof CHARACTERS)[number];
 
   // Bat-only animation: hang upside down from a branch while napping.
   const css = document.createElement('style');
@@ -38,7 +39,7 @@
   `;
   document.head.appendChild(css);
 
-  function extraSVG(extra, c) {
+  function extraSVG(extra: string, c: Char): string {
     switch (extra) {
       case 'tuft':
         return `<path d="M21.4 16.6 Q22 12.6 24 14.6 Q24.6 11.2 26.4 13.8 Q27.8 12.4 27 16.6 Z" fill="${FUR_DARK}"/>`;
@@ -70,8 +71,8 @@
     }
   }
 
-  function draw(c, size) {
-    const toolAngle = { can: 0, lantern: 0, magnifier: 10 }[c.tool] ?? 18;
+  function draw(c: Char, size: number): string {
+    const toolAngle = toolAngleFor(c.tool);
     return `
 <svg class="gnome-svg pack-bats tool-${c.tool}" viewBox="0 0 48 56" width="${size}" height="${(size * 56) / 48}" aria-hidden="true">
   <ellipse class="g-shadow" cx="24" cy="53" rx="12" ry="2.4"/>

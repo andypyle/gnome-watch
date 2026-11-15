@@ -13,6 +13,10 @@ const CHARACTERS = [
 ];
 
 const SKIN = '#f2c6a0';
+// How far each tool tilts in the hand (degrees). Shared with the other packs.
+function toolAngleFor(tool: string): number {
+  return ({ can: 0, lantern: 0, magnifier: 10 } as Record<string, number>)[tool] ?? 18;
+}
 const METAL = '#9aa3ae';
 const WOOD = '#8a5a33';
 
@@ -22,14 +26,14 @@ const WOOD = '#8a5a33';
 // so every pack gets the same working / waving / napping animations for free.
 window.PACKS = window.PACKS || {};
 let activePack = 'gnomes';
-function setPack(id) {
+function setPack(id: string) {
   if (window.PACKS[id]) activePack = id;
 }
 function pack() {
   return window.PACKS[activePack] || window.PACKS.gnomes;
 }
 
-function character(slot) {
+function character(slot: number): import('./types').Character {
   const list = pack().characters;
   const c = list[slot % list.length];
   const round = Math.floor(slot / list.length);
@@ -37,7 +41,7 @@ function character(slot) {
 }
 
 // Tools are drawn with the hand at (0,0), pointing up.
-function toolSVG(tool, c) {
+function toolSVG(tool: string, c: { hat: string }): string {
   switch (tool) {
     case 'hammer':
       return `<rect x="-.85" y="-12" width="1.7" height="12.5" rx=".8" fill="${WOOD}"/>
@@ -83,7 +87,7 @@ function toolSVG(tool, c) {
   }
 }
 
-function extraSVG(extra, c) {
+function extraSVG(extra: string): string {
   switch (extra) {
     case 'pompom':
       return `<circle cx="23.5" cy="2" r="2.4" fill="#f7f4ee"/>`;
@@ -111,12 +115,12 @@ function extraSVG(extra, c) {
   }
 }
 
-function gnomeSVG(slot, size = 46) {
+function gnomeSVG(slot: number, size = 46): string {
   return pack().draw(character(slot), size);
 }
 
-function drawGnome(c, size) {
-  const toolAngle = { can: 0, lantern: 0, magnifier: 10 }[c.tool] ?? 18;
+function drawGnome(c: (typeof CHARACTERS)[number], size: number): string {
+  const toolAngle = toolAngleFor(c.tool);
   const scarf =
     c.extra === 'scarf'
       ? `<path d="M15.5 35 Q24 39 32.5 35 L32.5 37.6 Q24 41.6 15.5 37.6 Z" fill="#c74a3a"/>
@@ -149,7 +153,7 @@ function drawGnome(c, size) {
       <circle cx="29.4" cy="27.8" r="1.3" fill="#f0a0a0" opacity=".55"/>
       <path d="M14.5 23.2 Q24 19.4 33.5 23.2 L31 9 Q29 2.5 23.5 1.5 Q27 6 25 9 Q21 4.5 17 15 Z" fill="${c.hat}"/>
       <path d="M14.2 23.4 Q24 19.2 33.8 23.4 Q34.4 25 33 25.2 Q24 21.8 15 25.2 Q13.6 25 14.2 23.4 Z" fill="rgba(0,0,0,.18)"/>
-      ${extraSVG(c.extra, c)}
+      ${extraSVG(c.extra)}
     </g>
     ${scarf}
     <g class="g-arm-tool">
@@ -171,7 +175,7 @@ function drawGnome(c, size) {
 
 // Helpers (your .claude/agents) get a gnome picked from their type name, so "design-agent"
 // always looks the same everywhere. It never matches the parent gnome it's helping.
-function helperSlot(type, parentSlot) {
+function helperSlot(type: string, parentSlot: number): number {
   let h = 2166136261;
   const t = String(type || 'helper').toLowerCase();
   for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619);
@@ -185,4 +189,4 @@ window.gnomeSVG = gnomeSVG;
 window.helperSlot = helperSlot;
 window.gnomeCharacter = character;
 window.setCharacterPack = setPack;
-window.packTools = { toolSVG, METAL, WOOD }; // shared with other packs
+window.packTools = { toolSVG, toolAngleFor, METAL, WOOD }; // shared with other packs
