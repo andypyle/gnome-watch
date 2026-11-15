@@ -19,6 +19,7 @@ const PACKS = [
   { id: 'capybaras', label: 'Capybaras' },
   { id: 'bats', label: 'Bats' },
   { id: 'cats', label: 'Cats' },
+  { id: 'bigfoot', label: 'Bigfoot' },
 ];
 
 try {
@@ -245,6 +246,18 @@ app.whenReady().then(async () => {
     if (state === 'editor') core.releaseAll(); // you're back: let VS Code show any open prompts
     refresh();
   }, logFocus);
+
+  // Every 20s: drop agents whose Claude Code process is gone, settle ones stuck on "working".
+  const isAlive = (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (e) {
+      return e.code === 'EPERM';
+    }
+  };
+  core.sweep(isAlive);
+  setInterval(() => core.sweep(isAlive), 20 * 1000);
 
   // Re-render periodically so "napping" gnomes stay fresh.
   setInterval(refresh, 30 * 1000);

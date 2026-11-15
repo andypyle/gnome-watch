@@ -175,6 +175,42 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.equal(all.length, 9);
   assert.equal(new Set(all.slice(0, 8).map((v) => v % 8)).size, 8);
 
+  // Background helper working after the main agent finished: main stays "done"
+  const c5 = createCore();
+  const e5 = (o) => c5.handleEvent({ session_id: 'bg', cwd: '/z/eventory', ...o }, null);
+  e5({ hook_event_name: 'UserPromptSubmit' });
+  e5({ hook_event_name: 'SubagentStart', agent_id: 'd1', agent_type: 'design-agent' });
+  e5({ hook_event_name: 'Stop' });
+  e5({ hook_event_name: 'PreToolUse', agent_id: 'd1', agent_type: 'design-agent', tool_name: 'mcp__claude_ai_Figma__use_figma' });
+  const bg = c5.snapshot().agents[0];
+  assert.equal(bg.status, 'done');
+  assert.match(bg.activity, /Your turn · 1 helper still working/);
+  assert.equal(bg.helpers[0].activity, 'Working in Figma');
+
+  // Sessions whose Claude Code process exited get removed
+  e5({ hook_event_name: 'UserPromptSubmit', _claude_pid: 999991 });
+  c5.handleEvent({ session_id: 'alive', cwd: '/z/other', hook_event_name: 'SessionStart', _claude_pid: 123 }, null);
+  c5.sweep((pid) => pid === 123);
+  assert.deepEqual(c5.snapshot().agents.map((a) => a.id), ['alive']);
+
+  // The hook script reports the Claude Code pid on session-level events
+  {
+    const tmpH = fs.mkdtempSync(path.join(os.tmpdir(), 'gw2-'));
+    const core6 = createCore();
+    process.env.HOME = tmpH;
+    os.homedir = () => tmpH;
+    delete require.cache[require.resolve('../src/server')];
+    const { startServer: start2 } = require('../src/server');
+    const { server: s6 } = await start2(core6);
+    await new Promise((r) => {
+      const p = spawn(process.execPath, [HOOK], { env: { ...process.env, HOME: tmpH } });
+      p.on('exit', r);
+      p.stdin.end(JSON.stringify({ session_id: 'pp', cwd: '/q', hook_event_name: 'SessionStart' }));
+    });
+    assert.ok(core6.agents.get('pp').pid > 0);
+    s6.close();
+  }
+
   console.log('All tests passed');
   process.exit(0);
 })().catch((e) => {

@@ -342,6 +342,27 @@ body.show-panel #tab { display: none; }
 .btn.link { background: transparent; color: var(--muted); padding: 5px 4px; font-weight: 500; margin-left: auto; }
 .btn.link:hover { color: var(--fg); }
 
+/* Questions: one at a time, sliding right-to-left */
+.q-tabs { display: flex; gap: 4px; margin: 2px 0 8px; overflow-x: auto; scrollbar-width: none; }
+.q-tabs::-webkit-scrollbar { display: none; }
+.q-tab {
+  font: inherit; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+  border-radius: 999px; padding: 2px 8px; cursor: pointer; white-space: nowrap; flex: none;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.q-tab:hover { color: var(--fg); }
+.q-tab.done::before { content: '✓ '; color: var(--done); }
+.q-tab.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.q-tab.active.done::before { color: inherit; }
+.q-viewport { overflow: hidden; transition: height .28s ease; margin-bottom: 8px; }
+.q-track { display: flex; align-items: flex-start; transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
+.q-pane { flex: 0 0 100%; min-width: 0; box-sizing: border-box; padding: 0 1px; }
+.q-pane[aria-hidden="true"] { visibility: hidden; transition: visibility 0s .32s; }
+.q-pane[aria-hidden="false"] { visibility: visible; }
+.q-hint { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+.btn[hidden] { display: none; }
+
 /* Compact mode: just the gnomes and their bars */
 body.compact .line2, body.compact .barlabel, body.compact .helpers { display: none; }
 body.compact .agent { padding-top: 5px; padding-bottom: 6px; }

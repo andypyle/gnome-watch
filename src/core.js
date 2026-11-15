@@ -12,7 +12,8 @@ function projectSlot(key) {
   for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
   return (h >>> 0) % CHARACTER_COUNT;
 }
-const HELPER_LINGER_MS = 4000; // a finished helper shows ✓ this long
+const HELPER_LINGER_MS = 4000;
+const STALE_WORKING_MS = 15 * 60 * 1000; // "working" with no news for this long -> idle (e.g. you interrupted it) // a finished helper shows ✓ this long
 const HELPER_STALE_MS = 15 * 60 * 1000; // hide helpers we haven't heard from in this long
 
 // "design-agent" -> "Design agent", "general-purpose" -> "General purpose", "Explore" -> "Explore"
@@ -169,13 +170,14 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     const name = ev.hook_event_name;
     const a = agentFor(ev);
     updateModel(a, ev);
+    if (ev._claude_pid) a.pid = ev._claude_pid;
     // Events from inside a helper (subagent) update that helper, not the main agent's line.
     const sub = ev.agent_id && name !== 'SubagentStop' ? helperFor(a, ev) : null;
     let reply = '';
     if (sub && (name === 'PreToolUse' || name === 'PostToolUse') && ev.tool_name !== 'AskUserQuestion') {
       if (name === 'PreToolUse') sub.activity = describeTool(ev.tool_name, ev.tool_input);
       else trackTasksFromTool(a, ev);
-      if (!hasPending(a.id)) a.status = 'working';
+      // A helper working in the background doesn't mean the main agent is: leave its status alone.
       onChange();
       return reply;
     }
@@ -429,7 +431,12 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
         modelId: a.model,
         cwd: a.cwd,
         status: a.status,
-        activity: a.activity,
+        activity: (() => {
+          const out = [...a.subagents.values()].filter((h) => h.status !== 'done' && now() - h.lastEvent < HELPER_STALE_MS).length;
+          if (out && (a.status === 'done' || a.status === 'idle'))
+            return `${a.activity.replace(/[.!]$/, '')} · ${out} helper${out > 1 ? 's' : ''} still working`;
+          return a.activity;
+        })(),
         tasksTotal: tasks.length,
         tasksDone: tasks.filter((t) => t.done).length,
         currentTask: (tasks.find((t) => !t.done) || {}).subject || null,
@@ -445,6 +452,32 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     });
     list.sort((x, y) => x.startedAt - y.startedAt);
     return { agents: list, pendingCount: pending.size };
+  }
+
+  // Called every so often by the app. Removes agents whose Claude Code process has exited
+  // (closed window, killed terminal) and settles agents that went quiet mid-task (e.g. interrupted).
+  function sweep(isAlive) {
+    let changed = false;
+    for (const a of [...agents.values()]) {
+      if (a.pid && !isAlive(a.pid)) {
+        releaseSession(a.id);
+        agents.delete(a.id);
+        changed = true;
+        continue;
+      }
+      if (a.status === 'working' && !hasPending(a.id) && now() - a.lastEvent > STALE_WORKING_MS) {
+        a.status = 'idle';
+        a.activity = 'Quiet for a while';
+        changed = true;
+      }
+      for (const [id, h] of a.subagents) {
+        if (h.status !== 'done' && now() - h.lastEvent > HELPER_STALE_MS) {
+          a.subagents.delete(id);
+          changed = true;
+        }
+      }
+    }
+    if (changed) onChange();
   }
 
   // Save/restore agents so restarting the widget doesn't lose sessions that are still open.
@@ -468,7 +501,7 @@ function createCore({ onChange = () => {}, shouldHold = () => true, now = () => 
     onChange();
   }
 
-  return { handleEvent, resolve, release, releaseAll, snapshot, serialize, restore, agents, pending };
+  return { handleEvent, resolve, release, releaseAll, snapshot, serialize, restore, sweep, agents, pending };
 }
 
 module.exports = { createCore, describeTool, prettyModel, helperLabel, projectSlot };

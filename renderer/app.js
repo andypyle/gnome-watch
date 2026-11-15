@@ -298,20 +298,60 @@ function permissionCard(a, p) {
 function questionCard(a, p) {
   const questions = (p.toolInput && p.toolInput.questions) || [];
   const answers = {}; // question text -> Set of labels | string
+  const multi = questions.length > 1;
   const card = h('div', 'card');
   card.append(h('div', 'chip', `${a.name} asks`));
-  const submit = h('button', 'btn', 'Send answer');
-  const ready = () =>
-    questions.every((q) => {
-      const v = answers[q.question];
-      return v && (typeof v === 'string' ? v.trim() : v.size);
-    });
-  const refresh = () => (submit.disabled = !ready());
 
-  questions.forEach((q) => {
-    const box = h('div', 'q');
-    if (q.header) box.append(h('div', 'chip', q.header));
-    box.append(h('div', 'qtext', q.question));
+  const answered = (q) => {
+    const v = answers[q.question];
+    return !!(v && (typeof v === 'string' ? v.trim() : v.size));
+  };
+  const ready = () => questions.every(answered);
+
+  // One question at a time: tabs on top, questions side by side in a sliding track.
+  const tabs = h('div', 'q-tabs');
+  const viewport = h('div', 'q-viewport');
+  const track = h('div', 'q-track');
+  viewport.append(track);
+  const panes = [];
+  const tabEls = [];
+  let current = 0;
+
+  const submit = h('button', 'btn', multi ? 'Send answers' : 'Send answer');
+  const next = h('button', 'btn secondary', 'Next →');
+
+  function go(i) {
+    current = Math.max(0, Math.min(questions.length - 1, i));
+    track.style.transform = `translateX(-${current * 100}%)`; // forward slides right-to-left
+    tabEls.forEach((t, j) => t.classList.toggle('active', j === current));
+    panes.forEach((pn, j) => pn.setAttribute('aria-hidden', j === current ? 'false' : 'true'));
+    viewport.style.height = `${panes[current].offsetHeight}px`;
+    refresh();
+  }
+
+  function refresh() {
+    tabEls.forEach((t, j) => t.classList.toggle('done', answered(questions[j])));
+    submit.disabled = !ready();
+    // Show "Next" until the last question, then "Send"
+    const onLast = current === questions.length - 1;
+    next.hidden = !multi || onLast;
+    submit.hidden = multi && !onLast && !ready();
+  }
+
+  function advance() {
+    if (current < questions.length - 1) setTimeout(() => go(current + 1), 260);
+  }
+
+  questions.forEach((q, i) => {
+    if (multi) {
+      const t = h('button', 'q-tab', q.header || `Question ${i + 1}`);
+      t.onclick = () => go(i);
+      tabEls.push(t);
+      tabs.append(t);
+    }
+    const pane = h('div', 'q-pane');
+    if (!multi && q.header) pane.append(h('div', 'chip', q.header));
+    pane.append(h('div', 'qtext', q.question));
     const opts = h('div', 'opts');
     const buttons = [];
     const other = h('input', 'other');
@@ -329,23 +369,34 @@ function questionCard(a, p) {
         } else {
           answers[q.question] = new Set([o.label]);
           buttons.forEach((x) => x.classList.toggle('selected', x === b));
+          advance(); // picking one answer moves on to the next question
         }
         refresh();
       };
       buttons.push(b);
       opts.append(b);
     });
+    if (q.multiSelect) opts.prepend(h('div', 'q-hint', 'Pick any that apply'));
     other.oninput = () => {
       buttons.forEach((x) => x.classList.remove('selected'));
       answers[q.question] = other.value;
       refresh();
     };
-    other.onkeydown = (e) => { if (e.key === 'Enter' && ready()) submit.click(); };
+    other.onkeydown = (e) => {
+      if (e.key !== 'Enter' || !answered(q)) return;
+      if (current < questions.length - 1) go(current + 1);
+      else if (ready()) submit.click();
+    };
     opts.append(other);
-    box.append(opts);
-    card.append(box);
+    pane.append(opts);
+    panes.push(pane);
+    track.append(pane);
   });
 
+  if (multi) card.append(tabs);
+  card.append(viewport);
+
+  next.onclick = () => go(current + 1);
   submit.onclick = () => {
     const out = {};
     for (const q of questions) {
@@ -357,9 +408,12 @@ function questionCard(a, p) {
   const vs = h('button', 'btn link', 'Use VS Code');
   vs.onclick = () => api.openEditor(a.id);
   const actions = h('div', 'actions');
-  actions.append(submit, vs);
+  actions.append(next, submit, vs);
   card.append(actions);
-  refresh();
+
+  // Size the viewport to the current question once the card is on screen.
+  requestAnimationFrame(() => go(0));
+  new ResizeObserver(() => (viewport.style.height = `${panes[current].offsetHeight}px`)).observe(track);
   return card;
 }
 

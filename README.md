@@ -14,14 +14,14 @@ Each agent gets its own character with a progress bar from its task list, the mo
 - **Helpers, too.** Subagents (including your own from `.claude/agents`) appear as smaller characters under the agent that started them, each with its own status line.
 - **Shows the model.** Each agent shows the model it's using, like *Opus 5.5*, and the label follows `/model` switches.
 - **Answer without switching.** Allow or deny permission prompts, and answer Claude's multiple-choice questions (or type your own answer), right from the panel.
-- **Character packs.** Gnomes, capybaras, bats or cats.
+- **Character packs.** Gnomes, capybaras, bats, cats or Bigfoot.
 - **Light and dark mode.** Follows your system appearance.
 
 ![Answering a permission prompt and a question from the panel](docs/prompts.png)
 
 ## Character packs
 
-Pick one from the menu-bar menu under **Character pack**. Every pack has the same eight roles, tools and animations, plus one special touch each: bats hang upside down to nap, and cats swish their tails.
+Pick one from the menu-bar menu under **Character pack**. Every pack has the same eight roles, tools and animations, plus a few special touches: bats hang upside down to nap, cats swish their tails, and Bigfoot hides behind a pine tree when it naps.
 
 ![The four character packs](docs/character-packs.png)
 
@@ -111,7 +111,7 @@ For troubleshooting, the app keeps a log of raw hook events in `~/.gnome-watch/e
 
 ## Adding a character pack
 
-A pack is one file in `renderer/packs/`. It defines 8 characters and a `draw(character, size)` function that returns an SVG. Copy `renderer/packs/cats.js` as a starting point. To get the shared animations for free, the SVG needs to use the same part classes:
+A pack is one file in `renderer/packs/`. It defines 8 characters and a `draw(character, size)` function that returns an SVG. Copy `renderer/packs/cats.js` or `renderer/packs/bigfoot.js` as a starting point. To get the shared animations for free, the SVG needs to use the same part classes:
 
 - `g-body`, `g-head`, `g-eye`
 - `g-eyes-open` / `g-eyes-closed`

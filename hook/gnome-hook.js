@@ -14,6 +14,27 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const http = require('http');
+const { execFileSync } = require('child_process');
+
+// Find the Claude Code process that ran this hook (skipping any shell in between), so the app
+// can tell when a session's process has exited even if no SessionEnd event arrives.
+function claudePid() {
+  let pid = process.ppid;
+  if (process.platform === 'win32') return pid;
+  try {
+    for (let i = 0; i < 4; i++) {
+      const out = execFileSync('ps', ['-o', 'ppid=,comm=', '-p', String(pid)], { encoding: 'utf8', timeout: 800 }).trim();
+      const m = /^(\d+)\s+(.*)$/.exec(out);
+      if (!m) break;
+      if (/(^|\/)-?(sh|bash|zsh|dash|fish)$/.test(m[2].trim())) {
+        pid = Number(m[1]);
+        continue;
+      }
+      return pid;
+    }
+  } catch {}
+  return pid;
+}
 
 const CONFIG = path.join(os.homedir(), '.gnome-watch', 'server.json');
 
@@ -35,6 +56,11 @@ function run() {
     ev = JSON.parse(input);
   } catch {
     return process.exit(0);
+  }
+
+  if (['SessionStart', 'UserPromptSubmit', 'Stop'].includes(ev.hook_event_name)) {
+    ev._claude_pid = claudePid();
+    input = JSON.stringify(ev);
   }
 
   const mayBlock =
