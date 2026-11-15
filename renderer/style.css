@@ -343,18 +343,27 @@ body.show-panel #tab { display: none; }
 .btn.link:hover { color: var(--fg); }
 
 /* Questions: one at a time, sliding right-to-left */
-.q-tabs { display: flex; gap: 4px; margin: 2px 0 8px; overflow-x: auto; scrollbar-width: none; }
-.q-tabs::-webkit-scrollbar { display: none; }
+.q-tabs { display: flex; gap: 4px; margin: 2px 0 8px; }
 .q-tab {
+  flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
   font: inherit; font-size: 11px; font-weight: 600;
   border: 1px solid var(--line); background: transparent; color: var(--muted);
-  border-radius: 999px; padding: 2px 8px; cursor: pointer; white-space: nowrap; flex: none;
-  transition: background .2s, color .2s, border-color .2s;
+  border-radius: 999px; padding: 2px 8px; cursor: pointer;
+  transition: background .2s, color .2s, border-color .2s, flex-grow .25s;
 }
 .q-tab:hover { color: var(--fg); }
-.q-tab.done::before { content: '✓ '; color: var(--done); }
+.q-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.q-num { display: none; font-variant-numeric: tabular-nums; }
+.q-tab.done::before { content: '✓'; color: var(--done); }
 .q-tab.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .q-tab.active.done::before { color: inherit; }
+
+/* 3–4 questions: the current tab gets the room and its full name; the others show their number (or ✓ once answered) */
+.q-tabs.many .q-tab { flex: 0 0 auto; min-width: 28px; padding: 2px 9px; }
+.q-tabs.many .q-tab:not(.active) .q-label { display: none; }
+.q-tabs.many .q-tab:not(.active):not(.done) .q-num { display: inline; }
+.q-tabs.many .q-tab.active { flex: 1 1 auto; }
 .q-viewport { overflow: hidden; transition: height .28s ease; margin-bottom: 8px; }
 .q-track { display: flex; align-items: flex-start; transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
 .q-pane { flex: 0 0 100%; min-width: 0; box-sizing: border-box; padding: 0 1px; }

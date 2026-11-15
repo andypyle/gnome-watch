@@ -309,7 +309,7 @@ function questionCard(a, p) {
   const ready = () => questions.every(answered);
 
   // One question at a time: tabs on top, questions side by side in a sliding track.
-  const tabs = h('div', 'q-tabs');
+  const tabs = h('div', questions.length > 2 ? 'q-tabs many' : 'q-tabs');
   const viewport = h('div', 'q-viewport');
   const track = h('div', 'q-track');
   viewport.append(track);
@@ -344,7 +344,10 @@ function questionCard(a, p) {
 
   questions.forEach((q, i) => {
     if (multi) {
-      const t = h('button', 'q-tab', q.header || `Question ${i + 1}`);
+      // Tab = number + label. With 3+ questions, only the current tab shows its label.
+      const t = h('button', 'q-tab');
+      t.append(h('span', 'q-num', String(i + 1)), h('span', 'q-label', q.header || `Question ${i + 1}`));
+      t.title = q.header ? `${q.header}: ${q.question}` : q.question;
       t.onclick = () => go(i);
       tabEls.push(t);
       tabs.append(t);
