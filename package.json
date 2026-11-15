@@ -1,0 +1,18 @@
+{
+  "name": "gnome-watch",
+  "version": "0.1.0",
+  "description": "A tiny always-on-top corner window that shows your Claude Code agents as gnomes, with task-progress bars, and lets you answer their questions without switching to VS Code.",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "install-hooks": "node scripts/install-hooks.js",
+    "uninstall-hooks": "node scripts/uninstall-hooks.js",
+    "test": "node test/core.test.js",
+    "package:mac": "electron-packager . \"Gnome Watch\" --platform=darwin --out=dist --overwrite --ignore=\"^/(test|dist|docs)\" --extend-info=assets/Info.extra.plist"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "@electron/packager": "^20.3.0"
+  }
+}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Gnome Watch</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="tab" title="Show my gnomes"></div>
+  <div id="panel" class="out">
+    <header id="titlebar">
+      <span class="title">Gnome Watch</span>
+      <span id="summary"></span>
+      <button id="collapse" class="icon-btn" title="Compact view">▾</button>
+      <button id="minimize" class="icon-btn" title="Minimize to the edge">⇥</button>
+    </header>
+    <div id="agents"></div>
+    <div id="empty" hidden>No gnomes at work. Start Claude Code and they'll show up here.</div>
+  </div>
+  <script src="gnome.js"></script>
+  <script src="packs/capybaras.js"></script>
+  <script src="packs/bats.js"></script>
+  <script src="packs/cats.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
