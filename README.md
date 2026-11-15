@@ -48,13 +48,12 @@ Keep the `gnome-watch` folder where it is after installing, because the hooks ru
 ### Build the app and start it at login (macOS)
 
 ```bash
-npm run package:mac
-mv "dist/Gnome Watch-darwin-arm64/Gnome Watch.app" /Applications/
+npm run install:mac
 ```
 
-On an Intel Mac, the folder is `Gnome Watch-darwin-x64`. Quit any copy you started with `npm start` (only one can run at a time), then open **Gnome Watch** from Applications. It lives in the menu bar with no Dock icon. Check **Start at login** in its menu.
+This builds the app, installs it to Applications (replacing any older copy) and opens it. Quit any copy you started with `npm start` first, because only one can run at a time. The app lives in the menu bar with no Dock icon. Check **Start at login** in its menu.
 
-After changing the code, run `npm run package:mac` again and replace the app.
+After changing the code, run `npm run install:mac` again. It quits the running app, rebuilds, swaps it in and reopens it. To only build without installing, use `npm run package:mac`.
 
 ## Using it
 

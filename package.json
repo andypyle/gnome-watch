@@ -9,7 +9,8 @@
     "install-hooks": "node scripts/install-hooks.js",
     "uninstall-hooks": "node scripts/uninstall-hooks.js",
     "test": "node test/core.test.js",
-    "package:mac": "electron-packager . \"Gnome Watch\" --platform=darwin --out=dist --overwrite --ignore=\"^/(test|dist|docs)\" --extend-info=assets/Info.extra.plist"
+    "package:mac": "electron-packager . \"Gnome Watch\" --platform=darwin --out=dist --overwrite --ignore=\"^/(test|dist|docs)\" --extend-info=assets/Info.extra.plist",
+    "install:mac": "sh scripts/install-mac.sh"
   },
   "devDependencies": {
     "electron": "^45.3.2",
