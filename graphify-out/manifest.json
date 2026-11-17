@@ -12,10 +12,10 @@
     "semantic_hash": "f49d8cee33c98f0cb0aa1234f4fc361b"
   },
   "renderer/app.ts": {
-    "mtime": 1794766859.6522057,
-    "seen": 1794772655.3420758,
-    "ast_hash": "833a18be03d1aa14579ee1ad82c86eab",
-    "semantic_hash": "833a18be03d1aa14579ee1ad82c86eab"
+    "mtime": 1794954550.6663225,
+    "seen": 1794954553.462903,
+    "ast_hash": "8d1ad22325b759177e41c59bdb841389",
+    "semantic_hash": ""
   },
   "renderer/gnome.ts": {
     "mtime": 1794766346.4741018,
@@ -114,10 +114,10 @@
     "semantic_hash": "a8ebef2e0021124211aaadf86c801d53"
   },
   "CLAUDE.md": {
-    "mtime": 1794766603.4970405,
-    "seen": 1794772655.342091,
-    "ast_hash": "e166666cd499e39dd66d172fefe654a1",
-    "semantic_hash": "e166666cd499e39dd66d172fefe654a1"
+    "mtime": 1794772836.4898918,
+    "seen": 1794773269.731,
+    "ast_hash": "c9084dbdb67eed082575d8b143501005",
+    "semantic_hash": ""
   },
   "README.md": {
     "mtime": 1794766587.6358495,
@@ -154,5 +154,23 @@
     "seen": 1794772655.3420951,
     "ast_hash": "33fa6ba8a57a8ae22fd1c61335fa2ba1",
     "semantic_hash": "33fa6ba8a57a8ae22fd1c61335fa2ba1"
+  },
+  ".claude/settings.json": {
+    "mtime": 1794773039.8670573,
+    "seen": 1794773269.730977,
+    "ast_hash": "75af27c4248179656abe1b9725695fa5",
+    "semantic_hash": ""
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1794772944.1575847,
+    "seen": 1794773269.730999,
+    "ast_hash": "9b31786b637be3c13978bec4c2330752",
+    "semantic_hash": ""
+  },
+  "package-lock.json": {
+    "mtime": 1794766235.1447022,
+    "seen": 1794773269.731006,
+    "ast_hash": "0761c7089f3e7f26604494003f31035c",
+    "semantic_hash": ""
   }
 }

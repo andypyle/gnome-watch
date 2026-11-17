@@ -1,1 +1,26 @@
-{"0": "Hook and Focus Detection", "1": "Renderer App UI", "2": "Core State Model", "3": "Package Manifest", "4": "README Features", "5": "Renderer Shared Types", "6": "Core Event Handling", "7": "Hook Install Scripts", "8": "Architecture Docs", "9": "Prompts Screenshot", "10": "TypeScript Config", "11": "Drawer Screenshot", "12": "Gnome Drawing", "13": "Character Packs", "14": "Cats Pack", "15": "Bats Pack", "16": "Bigfoot Pack", "17": "Capybaras Pack", "18": "Tray Icon", "19": "Hook Path Gotcha", "20": "Mac Install Script", "21": "App Path Gotcha", "22": "Electron Env Gotcha", "23": "Model Label"}
+{
+  "0": "Hook and Focus Detection",
+  "1": "Renderer App UI",
+  "2": "Core State Model",
+  "3": "Package Manifest",
+  "4": "README Features",
+  "5": "Renderer Shared Types",
+  "6": "Core Event Handling",
+  "7": "Hook Install Scripts",
+  "8": "Architecture Docs",
+  "9": "Prompts Screenshot",
+  "10": "TypeScript Config",
+  "11": "Drawer Screenshot",
+  "12": "Gnome Drawing",
+  "13": "Character Packs",
+  "14": "Cats Pack",
+  "15": "Bats Pack",
+  "16": "Bigfoot Pack",
+  "17": "Capybaras Pack",
+  "18": "Tray Icon",
+  "19": "Hook Path Gotcha",
+  "20": "Mac Install Script",
+  "21": "App Path Gotcha",
+  "22": "Electron Env Gotcha",
+  "23": "Model Label"
+}

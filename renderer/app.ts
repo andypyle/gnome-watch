@@ -45,6 +45,7 @@ const els = {
 const rows = new Map<string, Row>(); // agentId -> row
 const minis = new Map<string, Mini>(); // agentId -> its little gnome on the tab
 const seenPending = new Set<string>();
+const lastStatus = new Map<string, string>(); // agentId -> status at the previous render
 let latest: State | null = null;
 
 byId('minimize').onclick = () => api.toggle();
@@ -470,17 +471,24 @@ function render(state: State) {
   if (state.maxListHeight) els.agents.style.maxHeight = `${state.maxListHeight}px`;
   const { agents } = state;
   const live = new Set(agents.map((a) => a.id));
-  for (const [id, r] of rows) if (!live.has(id)) { r.el.remove(); rows.delete(id); }
+  for (const [id, r] of rows) if (!live.has(id)) { r.el.remove(); rows.delete(id); lastStatus.delete(id); }
 
   let newPending = false;
+  let newlyDone = false;
   agents.forEach((a, i) => {
+    // Only a change we saw counts, so opening the app doesn't chime for agents already done.
+    // "done" only once background helpers have finished too, so the chime marks the real end.
+    const st = a.status === 'done' && a.helpers.some((h) => h.status === 'working') ? 'helpers' : a.status;
+    const prev = lastStatus.get(a.id);
+    if (st === 'done' && prev && prev !== 'done') newlyDone = true;
+    lastStatus.set(a.id, st);
     let r = rows.get(a.id);
     if (!r) { r = makeRow(a); rows.set(a.id, r); }
     updateRow(r, a);
     if (els.agents.children[i] !== r.el) els.agents.insertBefore(r.el, els.agents.children[i] || null);
     for (const p of a.pending) if (!seenPending.has(p.id)) { seenPending.add(p.id); newPending = true; }
   });
-  if (newPending && state.sound) chime();
+  if ((newPending || newlyDone) && state.sound) chime();
 
   renderTab(agents);
   if (typeof state.expanded === 'boolean') setExpanded(state.expanded);

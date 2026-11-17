@@ -1,12 +1,19 @@
-# Graph Report - gnome-watch  (2026-11-15)
+# Graph Report - gnome-watch  (2026-11-17)
 
 ## Corpus Check
-- Corpus is ~17,455 words - fits in a single context window. You may not need a graph.
+- 23 files · ~17,840 words
+- Verdict: corpus is large enough that graph structure adds value.
+- Unclassified: 4 file(s) not represented in the graph (top: (none) 2, .plist 1, .css 1)
 
 ## Summary
-- 292 nodes · 403 edges · 24 communities (18 shown, 6 thin omitted)
+- 295 nodes · 405 edges · 25 communities (18 shown, 7 thin omitted)
 - Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 43 edges (avg confidence: 0.85)
 - Token cost: 262,612 input · 0 output
+
+## Graph Freshness
+- Built from commit: `b8e69f72`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - Hook and Focus Detection
@@ -32,6 +39,7 @@
 - Mac Install Script
 - Electron Env Gotcha
 - Model Label
+- core.test.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `createCore()` - 22 edges
@@ -46,41 +54,37 @@
 10. `GnomeApi` - 6 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Privacy (127.0.0.1 + per-launch token)` --semantically_similar_to--> `server.json Port/Token Discovery`  [INFERRED] [semantically similar]
-  README.md → CLAUDE.md
+- `#agents container` --implements--> `One Character Per Agent`  [INFERRED]
+  renderer/index.html → README.md
+- `Content-Security-Policy (self-only scripts)` --conceptually_related_to--> `Privacy (127.0.0.1 + per-launch token)`  [INFERRED]
+  renderer/index.html → README.md
 - `Renderer TS Files Are Classic Scripts` --rationale_for--> `Script Load Order (gnome.js, packs, app.js)`  [INFERRED]
   CLAUDE.md → renderer/index.html
 - `#tab (minimized edge tab)` --implements--> `Drawer Slides Out When Leaving VS Code`  [INFERRED]
   renderer/index.html → README.md
 - `#titlebar with collapse/minimize buttons` --implements--> `Drawer Slides Out When Leaving VS Code`  [INFERRED]
   renderer/index.html → README.md
-- `#agents container` --implements--> `One Character Per Agent`  [INFERRED]
-  renderer/index.html → README.md
 
 ## Import Cycles
 - None detected.
 
 ## Hyperedges (group relationships)
-- **Hook Event Pipeline (hook, server discovery, held prompts, timeout)** — claude_hook_to_renderer_flow, claude_hook_always_exit_0, claude_server_json_discovery, claude_held_prompts, readme_prompt_timeout_handback [INFERRED 0.85]
 - **Adding a Character Pack** — readme_character_packs, readme_pack_part_classes, claude_packs_iife, renderer_index_script_load_order [EXTRACTED 1.00]
+- **Session card anatomy** — docs_drawer_session_card, docs_drawer_gnome_character, docs_drawer_session_states, docs_drawer_model_badge, docs_drawer_task_progress_bar, docs_drawer_subagent_rows [EXTRACTED 1.00]
 - **Drawer UI Shell** — renderer_index_tab, renderer_index_panel, renderer_index_titlebar, renderer_index_agents [EXTRACTED 1.00]
 - **All five packs share per-slot tools and accent colors** — docs_character_packs_gnomes_pack, docs_character_packs_capybaras_pack, docs_character_packs_bats_pack, docs_character_packs_cats_pack, docs_character_packs_bigfoot_pack, docs_character_packs_slot_tool_scheme [INFERRED 0.85]
-- **Session card anatomy** — docs_drawer_session_card, docs_drawer_gnome_character, docs_drawer_session_states, docs_drawer_model_badge, docs_drawer_task_progress_bar, docs_drawer_subagent_rows [EXTRACTED 1.00]
 - **Answering held prompts inline from the drawer** — docs_prompts_permission_card, docs_prompts_question_card, docs_prompts_use_vs_code, docs_prompts_allow_deny_buttons, docs_prompts_send_answer [INFERRED 0.85]
+- **Hook Event Pipeline (hook, server discovery, held prompts, timeout)** — claude_hook_to_renderer_flow, claude_hook_always_exit_0, claude_server_json_discovery, claude_held_prompts, readme_prompt_timeout_handback [INFERRED 0.85]
 
-## Communities (24 total, 6 thin omitted)
+## Communities (25 total, 7 thin omitted)
 
 ### Community 0 - "Hook and Focus Detection"
-Cohesion: 0.09
-Nodes (25): claudePid(), CONFIG, run(), HookEvent, Done, FrontApp, watchFocus(), AGENTS_FILE (+17 more)
+Cohesion: 0.13
+Nodes (19): HookEvent, AGENTS_FILE, core, createWindow(), isExpanded(), Mode, PACKS, PREFS (+11 more)
 
 ### Community 1 - "Renderer App UI"
 Cohesion: 0.10
-Nodes (32): AgentView, BUBBLE, Character, chime(), displayStatus(), els, h(), HelperItem (+24 more)
-
-### Community 2 - "Core State Model"
-Cohesion: 0.09
-Nodes (23): Agent, CoreOptions, snapshot(), describeTool(), Helper, helperLabel(), modelFromTranscript(), Pending (+15 more)
+Nodes (33): AgentView, BUBBLE, Character, chime(), displayStatus(), els, h(), HelperItem (+25 more)
 
 ### Community 3 - "Package Manifest"
 Cohesion: 0.09
@@ -91,16 +95,16 @@ Cohesion: 0.11
 Nodes (20): _claude_pid Dead Session Sweep, Packs Are IIFEs Registering on window.PACKS, Agent Status States (busy, needs you, finished, napping), Character Packs, Drawer Slides Out When Leaving VS Code, events.log (~/.gnome-watch, ~2 MB cap), Front-App Focus Detection (focus.log), Menu-Bar Menu (+12 more)
 
 ### Community 5 - "Renderer Shared Types"
-Cohesion: 0.10
-Nodes (8): Character, GnomeApi, Pack, ResolveAction, State, Window, AgentView, Focus
+Cohesion: 0.08
+Nodes (11): Character, GnomeApi, Pack, ResolveAction, State, Window, AgentView, Done (+3 more)
 
 ### Community 6 - "Core Event Handling"
-Cohesion: 0.24
-Nodes (16): createCore(), agentFor(), drop(), finish(), handleEvent(), hasPending(), helperFor(), hold() (+8 more)
+Cohesion: 0.11
+Nodes (30): Agent, CoreOptions, createCore(), agentFor(), drop(), finish(), handleEvent(), hasPending() (+22 more)
 
 ### Community 7 - "Hook Install Scripts"
-Cohesion: 0.17
-Nodes (12): EVENTS, HookEntry, hookPath, main(), MARKER, Settings, settingsDir, settingsFile (+4 more)
+Cohesion: 0.13
+Nodes (15): claudePid(), CONFIG, run(), EVENTS, HookEntry, hookPath, main(), MARKER (+7 more)
 
 ### Community 8 - "Architecture Docs"
 Cohesion: 0.18
@@ -142,25 +146,29 @@ Nodes (3): Char, draw(), extraSVG()
 Cohesion: 0.67
 Nodes (3): Char, draw(), extraSVG()
 
+### Community 24 - "core.test.ts"
+Cohesion: 0.18
+Nodes (9): projectSlot(), Core, { createCore, prettyModel, projectSlot }, Ev, HOOK, run(), runHook(), { startServer } (+1 more)
+
 ## Knowledge Gaps
-- **27 isolated node(s):** `ELECTRON_RUN_AS_NODE in VS Code Terminal`, `_claude_pid Dead Session Sweep`, `Task List Progress Bar`, `Subagent Helpers`, `Model Label (follows /model)` (+22 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 133 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **27 isolated node(s):** `Light and Dark Themes`, `Model Badge (Opus / Sonnet / Haiku)`, `Subagent Rows`, `Task Progress Bar`, `Shared 8-Slot Tool and Accent Color Scheme` (+22 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 136 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `electron` connect `Package Manifest` to `Hook and Focus Detection`?**
-  _High betweenness centrality (0.060) - this node is a cross-community bridge._
+  _High betweenness centrality (0.059) - this node is a cross-community bridge._
 - **Are the 9 inferred relationships involving `createCore()` (e.g. with `handleEvent()` and `release()`) actually correct?**
   _`createCore()` has 9 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `ELECTRON_RUN_AS_NODE in VS Code Terminal`, `_claude_pid Dead Session Sweep`, `Task List Progress Bar` to the rest of the system?**
+- **What connects `Light and Dark Themes`, `Model Badge (Opus / Sonnet / Haiku)`, `Subagent Rows` to the rest of the system?**
   _27 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Hook and Focus Detection` be split into smaller, more focused modules?**
-  _Cohesion score 0.08571428571428572 - nodes in this community are weakly interconnected._
-- **Why does `createCore()` connect `Core Event Handling` to `Hook and Focus Detection`, `Core State Model`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
+  _Cohesion score 0.13043478260869565 - nodes in this community are weakly interconnected._
+- **Why does `createCore()` connect `Core Event Handling` to `Hook and Focus Detection`, `core.test.ts`?**
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **Should `Renderer App UI` be split into smaller, more focused modules?**
-  _Cohesion score 0.10338680926916222 - nodes in this community are weakly interconnected._
-- **Should `Core State Model` be split into smaller, more focused modules?**
-  _Cohesion score 0.08547008547008547 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09915966386554621 - nodes in this community are weakly interconnected._
+- **Should `Package Manifest` be split into smaller, more focused modules?**
+  _Cohesion score 0.09420289855072464 - nodes in this community are weakly interconnected._
